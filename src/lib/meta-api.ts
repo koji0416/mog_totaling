@@ -12,38 +12,59 @@ function getAccessToken(): string {
   return token;
 }
 
-// 広告アカウント一覧を取得（ビジネスポートフォリオ情報付き）
+// ページネーション付きで全ページ取得
+async function fetchAllPages<T>(initialUrl: string): Promise<T[]> {
+  const all: T[] = [];
+  let url: string | null = initialUrl;
+
+  while (url) {
+    const res: Response = await fetch(url, { cache: "no-store" });
+    const data: { data?: T[]; paging?: { next?: string }; error?: { code?: number; message?: string } } = await res.json();
+
+    if (data.error) {
+      throw data.error;
+    }
+
+    if (data.data) {
+      all.push(...data.data);
+    }
+
+    url = data.paging?.next || null;
+  }
+
+  return all;
+}
+
+type RawAdAccount = {
+  id: string;
+  name: string;
+  account_status: number;
+  currency: string;
+  business?: { id: string; name: string };
+};
+
+// 広告アカウント一覧を取得（ビジネスポートフォリオ情報付き、全件）
 export async function fetchAdAccounts(): Promise<AdAccount[]> {
   const token = getAccessToken();
 
-  // まずbusiness情報付きで試行、権限エラーなら情報なしで再試行
-  let data;
-  const urlWithBiz = `${BASE_URL}/me/adaccounts?fields=id,name,account_status,currency,business{id,name}&limit=100&access_token=${token}`;
-  const res = await fetch(urlWithBiz, { cache: "no-store" });
-  data = await res.json();
+  let rawAccounts: RawAdAccount[];
 
-  if (data.error) {
-    // business_management権限がない場合、business情報なしで再試行
-    if (data.error.code === 100 || data.error.message?.includes("business_management")) {
-      const urlNoBiz = `${BASE_URL}/me/adaccounts?fields=id,name,account_status,currency&limit=100&access_token=${token}`;
-      const res2 = await fetch(urlNoBiz, { cache: "no-store" });
-      data = await res2.json();
-
-      if (data.error) {
-        throw new Error(`Meta API エラー: ${data.error.message}`);
-      }
+  try {
+    // まずbusiness情報付きで試行
+    const url = `${BASE_URL}/me/adaccounts?fields=id,name,account_status,currency,business{id,name}&limit=100&access_token=${token}`;
+    rawAccounts = await fetchAllPages<RawAdAccount>(url);
+  } catch (err: unknown) {
+    const apiErr = err as { code?: number; message?: string };
+    // business_management権限がない場合、情報なしで再試行
+    if (apiErr.code === 100 || apiErr.message?.includes("business_management")) {
+      const url = `${BASE_URL}/me/adaccounts?fields=id,name,account_status,currency&limit=100&access_token=${token}`;
+      rawAccounts = await fetchAllPages<RawAdAccount>(url);
     } else {
-      throw new Error(`Meta API エラー: ${data.error.message}`);
+      throw new Error(`Meta API エラー: ${apiErr.message || "不明なエラー"}`);
     }
   }
 
-  return (data.data as Array<{
-    id: string;
-    name: string;
-    account_status: number;
-    currency: string;
-    business?: { id: string; name: string };
-  }>).map((a) => ({
+  return rawAccounts.map((a) => ({
     id: a.id,
     name: a.name,
     account_status: a.account_status,
