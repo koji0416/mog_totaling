@@ -50,6 +50,7 @@ export default function Dashboard() {
     async function load() {
       try {
         const res = await fetch("/api/meta/accounts");
+        if (res.redirected) return;
         const data = await res.json();
         if (data.error) {
           setError(data.error);
@@ -74,6 +75,13 @@ export default function Dashboard() {
           fetch(`/api/meta/insights?accountId=${accountId}&datePreset=${preset}&mode=campaign`),
           fetch(`/api/meta/insights?accountId=${accountId}&datePreset=${preset}&mode=daily`),
         ]);
+
+        // セッション切れでリダイレクトされた場合
+        if (campRes.redirected || dailyRes.redirected) {
+          router.push("/login");
+          return;
+        }
+
         const campData = await campRes.json();
         const dailyData = await dailyRes.json();
 
@@ -92,8 +100,8 @@ export default function Dashboard() {
         }
 
         setLastUpdated(new Date());
-      } catch {
-        setError("データの取得に失敗しました。");
+      } catch (e) {
+        setError(`データの取得に失敗しました。${e instanceof Error ? e.message : ""}`);
         setCampaigns([]);
         setDaily([]);
       } finally {
