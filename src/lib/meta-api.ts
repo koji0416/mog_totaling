@@ -15,13 +15,26 @@ function getAccessToken(): string {
 // 広告アカウント一覧を取得（ビジネスポートフォリオ情報付き）
 export async function fetchAdAccounts(): Promise<AdAccount[]> {
   const token = getAccessToken();
-  const url = `${BASE_URL}/me/adaccounts?fields=id,name,account_status,currency,business{id,name}&limit=100&access_token=${token}`;
 
-  const res = await fetch(url, { cache: "no-store" });
-  const data = await res.json();
+  // まずbusiness情報付きで試行、権限エラーなら情報なしで再試行
+  let data;
+  const urlWithBiz = `${BASE_URL}/me/adaccounts?fields=id,name,account_status,currency,business{id,name}&limit=100&access_token=${token}`;
+  const res = await fetch(urlWithBiz, { cache: "no-store" });
+  data = await res.json();
 
   if (data.error) {
-    throw new Error(`Meta API エラー: ${data.error.message}`);
+    // business_management権限がない場合、business情報なしで再試行
+    if (data.error.code === 100 || data.error.message?.includes("business_management")) {
+      const urlNoBiz = `${BASE_URL}/me/adaccounts?fields=id,name,account_status,currency&limit=100&access_token=${token}`;
+      const res2 = await fetch(urlNoBiz, { cache: "no-store" });
+      data = await res2.json();
+
+      if (data.error) {
+        throw new Error(`Meta API エラー: ${data.error.message}`);
+      }
+    } else {
+      throw new Error(`Meta API エラー: ${data.error.message}`);
+    }
   }
 
   return (data.data as Array<{
