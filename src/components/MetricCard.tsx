@@ -17,11 +17,11 @@ export default function MetricCard({ label, value, accent }: Props) {
   const style = accentStyles[accent] || accentStyles.blue;
 
   return (
-    <div className={`rounded-xl border ${style.border} ${style.bg} p-4 transition-shadow hover:shadow-md`}>
-      <div className={`text-xs font-semibold uppercase tracking-wide ${style.text} opacity-70`}>
+    <div className={`rounded-xl border ${style.border} ${style.bg} p-3 sm:p-4 transition-shadow hover:shadow-md`}>
+      <div className={`text-[10px] sm:text-xs font-semibold uppercase tracking-wide ${style.text} opacity-70`}>
         {label}
       </div>
-      <div className={`mt-2 text-2xl font-bold ${style.text}`}>
+      <div className={`mt-1 sm:mt-2 text-lg sm:text-2xl font-bold ${style.text} truncate`}>
         {value}
       </div>
     </div>
