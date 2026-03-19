@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { AdAccount, CampaignMetrics, DailyMetrics, DatePreset } from "@/lib/types";
 import DateRangeSelector from "@/components/DateRangeSelector";
 import AccountList from "@/components/AccountList";
@@ -36,6 +37,7 @@ export default function Dashboard() {
   const [refreshInterval, setRefreshInterval] = useState<RefreshInterval>(0);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  const router = useRouter();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const selectedAccountRef = useRef(selectedAccountId);
   const datePresetRef = useRef(datePreset);
@@ -124,6 +126,12 @@ export default function Dashboard() {
     }
   }
 
+  // ログアウト
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+  }
+
   // 自動更新のタイマー管理
   useEffect(() => {
     if (intervalRef.current) {
@@ -185,6 +193,19 @@ export default function Dashboard() {
               onSelect={handleSelectAccount}
             />
           )}
+        </div>
+
+        {/* ログアウト */}
+        <div className="border-t border-gray-200 p-3">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            ログアウト
+          </button>
         </div>
       </aside>
 
