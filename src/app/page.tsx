@@ -257,7 +257,7 @@ export default function Dashboard() {
                       {selectedAccount.name}
                     </h2>
                     <p className="text-xs text-gray-400 mt-0.5 truncate hidden sm:block">
-                      {selectedAccount.id} · {selectedAccount.currency}
+                      {selectedAccount.businessName} · {selectedAccount.id} · {selectedAccount.currency}
                       {lastUpdated && (
                         <span className="ml-2">
                           · 最終更新 {lastUpdated.toLocaleTimeString("ja-JP")}

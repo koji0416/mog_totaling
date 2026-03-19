@@ -4,6 +4,8 @@ export interface AdAccount {
   name: string;
   account_status: number;
   currency: string;
+  businessName: string; // ビジネスポートフォリオ名
+  businessId: string;
 }
 
 // Meta APIから返ってくるインサイト（生データ）

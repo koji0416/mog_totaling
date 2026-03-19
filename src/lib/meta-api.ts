@@ -12,10 +12,10 @@ function getAccessToken(): string {
   return token;
 }
 
-// 広告アカウント一覧を取得
+// 広告アカウント一覧を取得（ビジネスポートフォリオ情報付き）
 export async function fetchAdAccounts(): Promise<AdAccount[]> {
   const token = getAccessToken();
-  const url = `${BASE_URL}/me/adaccounts?fields=id,name,account_status,currency&limit=100&access_token=${token}`;
+  const url = `${BASE_URL}/me/adaccounts?fields=id,name,account_status,currency,business{id,name}&limit=100&access_token=${token}`;
 
   const res = await fetch(url, { cache: "no-store" });
   const data = await res.json();
@@ -24,7 +24,20 @@ export async function fetchAdAccounts(): Promise<AdAccount[]> {
     throw new Error(`Meta API エラー: ${data.error.message}`);
   }
 
-  return data.data as AdAccount[];
+  return (data.data as Array<{
+    id: string;
+    name: string;
+    account_status: number;
+    currency: string;
+    business?: { id: string; name: string };
+  }>).map((a) => ({
+    id: a.id,
+    name: a.name,
+    account_status: a.account_status,
+    currency: a.currency,
+    businessName: a.business?.name || "未割当",
+    businessId: a.business?.id || "none",
+  }));
 }
 
 // コンバージョンに該当するアクションタイプ
