@@ -60,10 +60,16 @@ export default function ProjectsPage() {
     return `${p.clientMenu}__${p.bizmanager}__${p.platform}`;
   }
 
+  function savedClientMenu(s: SavedProject): string {
+    return s.menu_name && s.menu_name !== "-"
+      ? s.client_name + "_" + s.menu_name
+      : s.client_name;
+  }
+
   function findSaved(p: DiscoveredProject): SavedProject | undefined {
     return saved.find(
       (s) =>
-        s.client_name + "_" + s.menu_name === p.clientMenu &&
+        savedClientMenu(s) === p.clientMenu &&
         (s.bizmanager_name || "").toLowerCase() === p.bizmanager.toLowerCase() &&
         s.platform === p.platform
     );

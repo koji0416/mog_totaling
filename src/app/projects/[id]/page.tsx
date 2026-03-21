@@ -119,9 +119,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         setPriceInput(projData.project.unit_price || 0);
 
         const p = projData.project as SavedProject;
+        const expectedClientMenu = p.menu_name && p.menu_name !== "-"
+          ? p.client_name + "_" + p.menu_name
+          : p.client_name;
         const match = (discoverData.projects || []).find(
           (d: DiscoveredProject) =>
-            d.clientMenu === p.client_name + "_" + p.menu_name &&
+            d.clientMenu === expectedClientMenu &&
             (d.bizmanager || "").toLowerCase() === (p.bizmanager_name || "").toLowerCase() &&
             d.platform === p.platform
         );
