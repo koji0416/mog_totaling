@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Meta Ads Dashboard",
-  description: "Meta広告のパフォーマンスダッシュボード",
+  title: "MOG Totalling",
+  description: "広告案件集計ダッシュボード",
 };
 
 export default function RootLayout({

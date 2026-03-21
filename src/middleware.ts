@@ -15,8 +15,12 @@ export async function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
+  const isApi = pathname.startsWith("/api/");
 
   if (!token) {
+    if (isApi) {
+      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+    }
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -24,7 +28,9 @@ export async function middleware(request: NextRequest) {
     await jwtVerify(token, SECRET);
     return NextResponse.next();
   } catch {
-    // トークンが無効・期限切れ → ログインへ
+    if (isApi) {
+      return NextResponse.json({ error: "セッションが切れました" }, { status: 401 });
+    }
     const response = NextResponse.redirect(new URL("/login", request.url));
     response.cookies.set(COOKIE_NAME, "", { maxAge: 0, path: "/" });
     return response;

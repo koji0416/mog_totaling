@@ -1,4 +1,4 @@
-import { AdAccount, InsightRow, CampaignMetrics, DailyMetrics } from "./types";
+import { AdAccount, InsightRow, CampaignMetrics, CampaignDailyMetrics, DailyMetrics } from "./types";
 
 const BASE_URL = "https://graph.facebook.com/v21.0";
 
@@ -117,7 +117,8 @@ function parseInsightRow(row: InsightRow): CampaignMetrics {
 // 特定アカウントのキャンペーン別インサイトを取得
 export async function fetchAccountInsights(
   accountId: string,
-  datePreset: string
+  since: string,
+  until: string
 ): Promise<CampaignMetrics[]> {
   const token = getAccessToken();
   const fields = [
@@ -131,7 +132,8 @@ export async function fetchAccountInsights(
     "cost_per_action_type",
   ].join(",");
 
-  const url = `${BASE_URL}/${accountId}/insights?fields=${fields}&level=campaign&date_preset=${datePreset}&limit=500&access_token=${token}`;
+  const timeRange = JSON.stringify({ since, until });
+  const url = `${BASE_URL}/${accountId}/insights?fields=${fields}&level=campaign&time_range=${encodeURIComponent(timeRange)}&limit=500&access_token=${token}`;
 
   const res = await fetch(url, { cache: "no-store" });
   const data = await res.json();
@@ -147,10 +149,67 @@ export async function fetchAccountInsights(
   return (data.data as InsightRow[]).map(parseInsightRow);
 }
 
+// キャンペーン別日別インサイトを取得（level=campaign + time_increment=1）
+export async function fetchCampaignDailyInsights(
+  accountId: string,
+  since: string,
+  until: string
+): Promise<CampaignDailyMetrics[]> {
+  const token = getAccessToken();
+  const fields = [
+    "campaign_name",
+    "campaign_id",
+    "spend",
+    "impressions",
+    "clicks",
+    "ctr",
+    "actions",
+    "cost_per_action_type",
+  ].join(",");
+
+  const timeRange = JSON.stringify({ since, until });
+  const url = `${BASE_URL}/${accountId}/insights?fields=${fields}&level=campaign&time_increment=1&time_range=${encodeURIComponent(timeRange)}&limit=500&access_token=${token}`;
+
+  const rows = await fetchAllPages<InsightRow>(url);
+
+  return rows.map((row) => {
+    let conversions = 0;
+    let linkClicks = 0;
+    let hasLinkClick = false;
+    if (row.actions) {
+      for (const action of row.actions) {
+        if (CONVERSION_ACTION_TYPES.includes(action.action_type)) {
+          conversions += parseInt(action.value, 10);
+        }
+        if (action.action_type === "link_click") {
+          hasLinkClick = true;
+          linkClicks += parseInt(action.value, 10);
+        }
+      }
+    }
+    const spend = parseFloat(row.spend) || 0;
+    // リンクのクリック（actions.link_click）を使用
+    // actionsにlink_clickが存在しない場合のみ、fieldsのclicksにフォールバック
+    const clicks = hasLinkClick ? linkClicks : parseInt(row.clicks, 10) || 0;
+    return {
+      campaignName: row.campaign_name,
+      campaignId: row.campaign_id,
+      date: row.date_start,
+      spend,
+      impressions: parseInt(row.impressions, 10) || 0,
+      clicks,
+      ctr: parseFloat(row.ctr) || 0,
+      conversions,
+      cpa: conversions > 0 ? spend / conversions : 0,
+    };
+  });
+}
+
 // 日別インサイトを取得（time_increment=1 で1日ごとに分割）
 export async function fetchDailyInsights(
   accountId: string,
-  datePreset: string
+  since: string,
+  until: string
 ): Promise<DailyMetrics[]> {
   const token = getAccessToken();
   const fields = [
@@ -162,7 +221,8 @@ export async function fetchDailyInsights(
     "cost_per_action_type",
   ].join(",");
 
-  const url = `${BASE_URL}/${accountId}/insights?fields=${fields}&date_preset=${datePreset}&time_increment=1&limit=500&access_token=${token}`;
+  const timeRange = JSON.stringify({ since, until });
+  const url = `${BASE_URL}/${accountId}/insights?fields=${fields}&time_range=${encodeURIComponent(timeRange)}&time_increment=1&limit=500&access_token=${token}`;
 
   const res = await fetch(url, { cache: "no-store" });
   const data = await res.json();

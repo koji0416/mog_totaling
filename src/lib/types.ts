@@ -34,6 +34,19 @@ export interface CampaignMetrics {
   cpa: number;
 }
 
+// キャンペーン別日別データ
+export interface CampaignDailyMetrics {
+  campaignName: string;
+  campaignId: string;
+  date: string; // "2024-01-15" 形式
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  conversions: number;
+  cpa: number;
+}
+
 // 日別データ（アカウント全体の合計）
 export interface DailyMetrics {
   date: string; // "2024-01-15" 形式
