@@ -129,6 +129,22 @@ function isClientMenuMatch(parsedMetaName: string, clientMenu: string): boolean 
     if (aLast === bLast) return true;
   }
 
+  // 業種サフィックスを除去してコア名で比較
+  // 例: "リアスクリニック" → "リアス", "リアス銀座クリニック" → "リアス銀座"
+  // → "リアス銀座".includes("リアス") → true
+  const suffixes = ["クリニック", "サロン", "ラボ", "エステ", "美容外科", "皮膚科"];
+  const removeSuffix = (s: string) => {
+    for (const sf of suffixes) {
+      if (s.endsWith(sf)) return s.slice(0, -sf.length);
+    }
+    return s;
+  };
+  const coreA = removeSuffix(a.split("_")[0]);
+  const coreB = removeSuffix(b.split("_")[0]);
+  if (coreA.length >= 2 && coreB.length >= 2) {
+    if (coreA.includes(coreB) || coreB.includes(coreA)) return true;
+  }
+
   return false;
 }
 
