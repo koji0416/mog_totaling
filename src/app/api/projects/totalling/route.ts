@@ -53,13 +53,26 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const [adRes, catsRes] = await Promise.all([adQuery, catsQuery]);
+  const overrideQuery = supabase
+    .from("daily_revenue_overrides")
+    .select("date, revenue")
+    .eq("project_id", projectId)
+    .gte("date", since)
+    .lte("date", until);
+
+  const [adRes, catsRes, overrideRes] = await Promise.all([adQuery, catsQuery, overrideQuery]);
 
   if (adRes.error) {
     return Response.json({ error: adRes.error.message }, { status: 500 });
   }
   if (catsRes.error) {
     return Response.json({ error: catsRes.error.message }, { status: 500 });
+  }
+
+  // 売上オーバーライドマップ
+  const revenueOverrides = new Map<string, number>();
+  for (const row of overrideRes.data || []) {
+    revenueOverrides.set(row.date, Number(row.revenue));
   }
 
   // 日別に集計
@@ -109,6 +122,7 @@ export async function GET(request: NextRequest) {
   // 期間内の全日を生成
   const rows = generateDateRange(since, until).map((date) => {
     const d = byDate.get(date);
+    const revenueOverride = revenueOverrides.get(date);
     return {
       date,
       codes: d ? [...d.codes].sort((a, b) => a - b) : [],
@@ -117,10 +131,48 @@ export async function GET(request: NextRequest) {
       clicks: d?.clicks || 0,
       mcv: d?.mcv || 0,
       cv: d?.cv || 0,
+      revenueOverride: revenueOverride ?? null,
     };
   });
 
   return Response.json({ rows });
+}
+
+// PATCH: 売上オーバーライドを保存/削除
+export async function PATCH(request: NextRequest) {
+  try {
+    const { projectId, date, revenue } = await request.json();
+    if (!projectId || !date) {
+      return Response.json({ error: "projectId, date は必須です" }, { status: 400 });
+    }
+
+    const supabase = createServerSupabase();
+
+    if (revenue === null || revenue === undefined || revenue === "") {
+      // 削除
+      await supabase
+        .from("daily_revenue_overrides")
+        .delete()
+        .eq("project_id", projectId)
+        .eq("date", date);
+      return Response.json({ deleted: true });
+    }
+
+    // upsert
+    const { error } = await supabase
+      .from("daily_revenue_overrides")
+      .upsert(
+        { project_id: projectId, date, revenue: Number(revenue) },
+        { onConflict: "project_id,date" }
+      );
+    if (error) {
+      return Response.json({ error: error.message }, { status: 500 });
+    }
+    return Response.json({ saved: true, revenue: Number(revenue) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "不明なエラー";
+    return Response.json({ error: message }, { status: 500 });
+  }
 }
 
 // POST: Meta/CATS APIからデータ取得 → Supabaseに保存 → 返却

@@ -32,6 +32,7 @@ interface TotallingRow {
   clicks: number;
   mcv: number;
   cv: number;
+  revenueOverride: number | null;
 }
 
 function fmtDateISO(d: Date): string {
@@ -99,6 +100,31 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   const [editingPrice, setEditingPrice] = useState(false);
   const [priceInput, setPriceInput] = useState(0);
+
+  // 売上編集
+  const [editingRevDate, setEditingRevDate] = useState<string | null>(null);
+  const [revInput, setRevInput] = useState("");
+
+  async function saveRevenue(date: string) {
+    if (!project) return;
+    const value = revInput.trim() === "" ? null : Number(revInput);
+    try {
+      await fetch("/api/projects/totalling", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: project.id, date, revenue: value }),
+      });
+      // ローカルで即反映
+      setRows((prev) =>
+        prev.map((r) =>
+          r.date === date ? { ...r, revenueOverride: value } : r
+        )
+      );
+    } catch {
+      setError("売上の保存に失敗しました");
+    }
+    setEditingRevDate(null);
+  }
 
   useEffect(() => {
     async function load() {
@@ -239,6 +265,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const canGoNext = !isCurrentMonth;
 
   const price = project?.unit_price || 0;
+  const getRevenue = (r: TotallingRow) => r.revenueOverride !== null ? r.revenueOverride : r.cv * price;
   const totals = rows.reduce(
     (acc, r) => ({
       spend: acc.spend + r.spend,
@@ -246,10 +273,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       clicks: acc.clicks + r.clicks,
       mcv: acc.mcv + r.mcv,
       cv: acc.cv + r.cv,
+      revenue: acc.revenue + getRevenue(r),
     }),
-    { spend: 0, impressions: 0, clicks: 0, mcv: 0, cv: 0 }
+    { spend: 0, impressions: 0, clicks: 0, mcv: 0, cv: 0, revenue: 0 }
   );
-  const totalRevenue = totals.cv * price;
+  const totalRevenue = totals.revenue;
   const totalGross = totalRevenue - totals.spend;
   const totalRoas = totals.spend > 0 ? totalRevenue / totals.spend : 0;
   const totalCpa = totals.cv > 0 ? totals.spend / totals.cv : 0;
@@ -477,8 +505,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 <tbody>
                   {rows.map((r, i) => {
                     const weekend = isWeekend(r.date);
-                    const revenue = r.cv * price;
+                    const revenue = getRevenue(r);
                     const grossProfit = revenue - r.spend;
+                    const hasOverride = r.revenueOverride !== null;
                     const roas = r.spend > 0 ? revenue / r.spend : 0;
                     const cpc = r.clicks > 0 ? r.spend / r.clicks : 0;
                     const cpm = r.impressions > 0 ? (r.spend / r.impressions) * 1000 : 0;
@@ -501,7 +530,24 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                           {rowHasData ? fmtYen(grossProfit) : "-"}
                         </td>
                         <td className="px-3 py-2 text-right font-medium">{fmtYen(r.spend)}</td>
-                        <td className="px-3 py-2 text-right">{fmtYen(revenue)}</td>
+                        <td
+                          className={`px-3 py-2 text-right cursor-pointer hover:bg-yellow-50 ${hasOverride ? "text-blue-600 underline decoration-dotted" : ""}`}
+                          onClick={() => { setEditingRevDate(r.date); setRevInput(revenue > 0 ? String(Math.round(revenue)) : ""); }}
+                        >
+                          {editingRevDate === r.date ? (
+                            <input
+                              type="number"
+                              value={revInput}
+                              onChange={(e) => setRevInput(e.target.value)}
+                              onBlur={() => saveRevenue(r.date)}
+                              onKeyDown={(e) => { if (e.key === "Enter") saveRevenue(r.date); if (e.key === "Escape") setEditingRevDate(null); }}
+                              className="w-20 text-right border border-blue-400 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              autoFocus
+                            />
+                          ) : (
+                            fmtYen(revenue)
+                          )}
+                        </td>
                         <td className="px-3 py-2 text-right">{fmtYen(cpc)}</td>
                         <td className="px-3 py-2 text-right">{fmtYen(cpm)}</td>
                         <td className="px-3 py-2 text-right">{fmt(r.impressions)}</td>
