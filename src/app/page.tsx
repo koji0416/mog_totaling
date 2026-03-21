@@ -75,9 +75,9 @@ export default function ProjectsPage() {
 
     let sv = findSaved(p);
     if (!sv) {
-      const parts = p.clientMenu.split("_");
-      const clientName = parts[0];
-      const menuName = parts.slice(1).join("_");
+      const idx = p.clientMenu.indexOf("_");
+      const clientName = idx > 0 ? p.clientMenu.substring(0, idx) : p.clientMenu;
+      const menuName = idx > 0 ? p.clientMenu.substring(idx + 1) : "-";
       try {
         const res = await fetch("/api/projects", {
           method: "POST",
@@ -148,12 +148,14 @@ export default function ProjectsPage() {
               <h1 className="text-base font-semibold tracking-tight">MOG Totalling</h1>
             </div>
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => router.push("/dashboard")}
+              <a
+                href="/dashboard"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
               >
                 Dashboard
-              </button>
+              </a>
               <button
                 onClick={handleLogout}
                 className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
