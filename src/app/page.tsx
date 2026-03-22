@@ -303,10 +303,10 @@ export default function ProjectsPage() {
               </div>
               <h1 className="text-base font-semibold tracking-tight">MOG 集計</h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button
                 onClick={() => setShowSheetPanel(!showSheetPanel)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-lg transition-all ${
                   showSheetPanel
                     ? "text-white bg-emerald-500 shadow-sm shadow-emerald-500/30"
                     : "text-gray-300 bg-gray-800 hover:text-white hover:bg-gray-700"
@@ -315,13 +315,13 @@ export default function ProjectsPage() {
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                SS反映
+                <span className="hidden sm:inline">SS反映</span>
               </button>
               <a
                 href="/dashboard"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-gray-300 bg-gray-800 rounded-lg hover:text-white hover:bg-gray-700 transition-all"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-gray-300 bg-gray-800 rounded-lg hover:text-white hover:bg-gray-700 transition-all"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -332,18 +332,21 @@ export default function ProjectsPage() {
                 href="/guide"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-gray-300 bg-gray-800 rounded-lg hover:text-white hover:bg-gray-700 transition-all"
+                className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-medium text-gray-300 bg-gray-800 rounded-lg hover:text-white hover:bg-gray-700 transition-all"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
-                使い方
+                <span className="hidden sm:inline">使い方</span>
               </a>
               <button
                 onClick={handleLogout}
-                className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                className="px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs text-gray-500 hover:text-gray-300 transition-colors"
               >
-                ログアウト
+                <span className="hidden sm:inline">ログアウト</span>
+                <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
               </button>
             </div>
           </div>
@@ -547,31 +550,31 @@ export default function ProjectsPage() {
           const totalRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
           const now = new Date();
           return (
-            <div className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/20 p-5 mb-5 text-white">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-bold">{now.getMonth() + 1}月 全体サマリー</h3>
-                <span className="text-xs text-blue-200">当月実績</span>
+            <div className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/20 px-4 sm:px-5 py-4 mb-5 text-white">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-sm sm:text-base font-bold">{now.getMonth() + 1}月 全体サマリー</h3>
+                <span className="text-[10px] sm:text-xs text-blue-200">当月実績</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 sm:gap-4">
                 <div>
-                  <p className="text-[10px] text-blue-200 font-medium uppercase tracking-wider">広告費</p>
-                  <p className="text-xl font-bold mt-1">¥{Math.round(totalSpend).toLocaleString()}</p>
+                  <p className="text-[9px] sm:text-[10px] text-blue-200 font-medium uppercase tracking-wider">広告費</p>
+                  <p className="text-base sm:text-xl font-bold mt-0.5 sm:mt-1">¥{Math.round(totalSpend).toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-blue-200 font-medium uppercase tracking-wider">売上</p>
-                  <p className="text-xl font-bold mt-1">¥{Math.round(totalRevenue).toLocaleString()}</p>
+                  <p className="text-[9px] sm:text-[10px] text-blue-200 font-medium uppercase tracking-wider">売上</p>
+                  <p className="text-base sm:text-xl font-bold mt-0.5 sm:mt-1">¥{Math.round(totalRevenue).toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-blue-200 font-medium uppercase tracking-wider">粗利</p>
-                  <p className={`text-xl font-bold mt-1 ${totalGross < 0 ? "text-red-300" : ""}`}>
+                  <p className="text-[9px] sm:text-[10px] text-blue-200 font-medium uppercase tracking-wider">粗利</p>
+                  <p className={`text-base sm:text-xl font-bold mt-0.5 sm:mt-1 ${totalGross < 0 ? "text-red-300" : ""}`}>
                     ¥{Math.round(totalGross).toLocaleString()}
                   </p>
                 </div>
-                <div>
+                <div className="hidden sm:block">
                   <p className="text-[10px] text-blue-200 font-medium uppercase tracking-wider">ROAS</p>
                   <p className="text-xl font-bold mt-1">{(totalRoas * 100).toFixed(1)}%</p>
                 </div>
-                <div>
+                <div className="hidden sm:block">
                   <p className="text-[10px] text-blue-200 font-medium uppercase tracking-wider">総CV</p>
                   <p className="text-xl font-bold mt-1">{totalCv.toLocaleString()}</p>
                 </div>
