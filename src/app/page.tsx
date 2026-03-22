@@ -254,7 +254,7 @@ export default function ProjectsPage() {
                     : "text-gray-400 hover:text-white hover:bg-gray-800"
                 }`}
               >
-                SS反映
+                スプレッドシート反映
               </button>
               <a
                 href="/dashboard"
@@ -262,13 +262,13 @@ export default function ProjectsPage() {
                 rel="noopener noreferrer"
                 className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
               >
-                Dashboard
+                広告データ詳細
               </a>
               <button
                 onClick={handleLogout}
                 className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
               >
-                Logout
+                ログアウト
               </button>
             </div>
           </div>
