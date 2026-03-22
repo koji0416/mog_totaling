@@ -606,13 +606,13 @@ export default function ProjectsPage() {
                     const grossProfit = summary ? summary.revenue - summary.spend : 0;
 
                     return (
-                      <div key={key} className="px-5 py-3 hover:bg-blue-50/30 transition-all group">
+                      <div
+                        key={key}
+                        onClick={() => !navigating && !editingPriceId && handleClick(p)}
+                        className={`px-5 py-3 hover:bg-blue-50/50 transition-all group cursor-pointer ${navigating ? "opacity-60" : ""}`}
+                      >
                         <div className="flex items-center justify-between">
-                          <button
-                            onClick={() => handleClick(p)}
-                            disabled={!!navigating}
-                            className="min-w-0 flex-1 text-left disabled:opacity-60"
-                          >
+                          <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2.5">
                               <span
                                 className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold rounded-md ${
@@ -625,9 +625,8 @@ export default function ProjectsPage() {
                               </span>
                               <span className="text-sm font-medium text-gray-800">{p.clientMenu}{p.bizmanager ? `_${p.bizmanager}` : ""}</span>
                             </div>
-                          </button>
+                          </div>
                           <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-                            {/* 当月サマリー */}
                             {summary && summary.spend > 0 && (
                               <div className="hidden sm:flex items-center gap-3 text-[11px]">
                                 <span className="text-gray-400">広告費 <span className="text-gray-700 font-medium">¥{Math.round(summary.spend).toLocaleString()}</span></span>
@@ -643,15 +642,9 @@ export default function ProjectsPage() {
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                               </svg>
                             ) : (
-                              <button
-                                onClick={() => handleClick(p)}
-                                disabled={!!navigating}
-                                className="p-1"
-                              >
-                                <svg className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                              </button>
+                              <svg className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
                             )}
                           </div>
                         </div>
