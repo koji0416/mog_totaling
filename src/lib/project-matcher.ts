@@ -139,10 +139,23 @@ function isClientMenuMatch(parsedMetaName: string, clientMenu: string): boolean 
     }
     return s;
   };
-  const coreA = removeSuffix(a.split("_")[0]);
-  const coreB = removeSuffix(b.split("_")[0]);
+  const aParts = a.split("_");
+  const bParts = b.split("_");
+  const coreA = removeSuffix(aParts[0]);
+  const coreB = removeSuffix(bParts[0]);
   if (coreA.length >= 2 && coreB.length >= 2) {
-    if (coreA.includes(coreB) || coreB.includes(coreA)) return true;
+    if (coreA.includes(coreB) || coreB.includes(coreA)) {
+      // クライアント名が一致しても、両方にメニュー部分がある場合はメニューも確認
+      if (aParts.length >= 2 && bParts.length >= 2) {
+        const aMenu = aParts.slice(1).join("_").replace(/\d+$/, "");
+        const bMenu = bParts.slice(1).join("_").replace(/\d+$/, "");
+        // メニューが完全に異なる場合は不一致
+        if (aMenu !== bMenu && !aMenu.includes(bMenu) && !bMenu.includes(aMenu)) {
+          return false;
+        }
+      }
+      return true;
+    }
   }
 
   return false;
