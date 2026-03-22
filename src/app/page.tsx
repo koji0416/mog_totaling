@@ -574,8 +574,7 @@ export default function ProjectsPage() {
                               >
                                 {p.platform === "meta" ? "Meta" : "TikTok"}
                               </span>
-                              <span className="text-sm font-semibold text-gray-900">{menuName}</span>
-                              <span className="text-xs text-gray-400 font-medium">{p.bizmanager}</span>
+                              <span className="text-sm font-medium text-gray-800">{p.clientMenu}{p.bizmanager ? `_${p.bizmanager}` : ""}</span>
                             </div>
                           </button>
                           <div className="flex items-center gap-3 flex-shrink-0 ml-4">
@@ -609,7 +608,6 @@ export default function ProjectsPage() {
                         </div>
                         {/* 下段: コード + 単価 */}
                         <div className="flex items-center gap-4 mt-1">
-                          <span className="text-xs text-gray-400">コード {p.codes.join(", ")}</span>
                           {sv && editingPriceId === sv.id ? (
                             <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                               <span className="text-xs text-gray-400">単価 ¥</span>
