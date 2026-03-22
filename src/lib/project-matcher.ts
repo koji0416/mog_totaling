@@ -123,11 +123,14 @@ function isClientMenuMatch(parsedMetaName: string, clientMenu: string): boolean 
     const bParts2 = b.split("_");
     // 両方単一セグメント → クライアント名一致でOK
     if (aParts2.length === 1 && bParts2.length === 1) return true;
-    // 両方単一 → すでに上で処理済み
-    // 片方単一・片方複数 → 単一側にメニュー指定がないので、
-    // 複数側のメニューが何であってもマッチ（コードで区別される）
-    // ただし、両方複数セグメントの場合はメニュー一致を確認
-    if (aParts2.length === 1 || bParts2.length === 1) return true;
+    // 片方単一・片方複数のケース
+    if (aParts2.length === 1 || bParts2.length === 1) {
+      // 両方単一ならクライアント名一致でOK（上で処理済み）
+      // 片方単一・片方複数の場合:
+      // Metaアカウント名(parsedMetaName=a)が複数セグメントで異なるメニューを持つ場合、
+      // CATS側(clientMenu=b)が単一セグメントなら、コードで区別されるのでOK
+      return true;
+    }
     // 両方複数セグメント → メニュー部分の一致を確認
     const aMenu = aParts2.slice(1).join("_").replace(/\d+$/, "");
     const bMenu = bParts2.slice(1).join("_").replace(/\d+$/, "");
@@ -183,10 +186,9 @@ export function discoverProjects(
     if (!parsed) continue;
 
     if (!allMetaNames.includes(parsed)) allMetaNames.push(parsed);
-    if (parsed.includes("_")) {
-      const clientOnly = parsed.split("_")[0];
-      if (!allMetaNames.includes(clientOnly)) allMetaNames.push(clientOnly);
-    }
+    // 単一セグメント名は追加しない（splitBodyで誤分割の原因になる）
+    // 例: "ビューティス_クマ取り" → "ビューティス" を追加すると
+    //      "ビューティス_エリシスセンス_beauty.oo" が誤分割される
 
     const bizKey = acc.businessName.toLowerCase();
     if (!byBusiness.has(bizKey)) byBusiness.set(bizKey, []);
