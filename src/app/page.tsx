@@ -301,28 +301,34 @@ export default function ProjectsPage() {
               </div>
               <h1 className="text-base font-semibold tracking-tight">MOG 集計</h1>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowSheetPanel(!showSheetPanel)}
-                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all ${
                   showSheetPanel
-                    ? "text-white bg-emerald-600 hover:bg-emerald-700"
-                    : "text-gray-400 hover:text-white hover:bg-gray-800"
+                    ? "text-white bg-emerald-500 shadow-sm shadow-emerald-500/30"
+                    : "text-gray-300 bg-gray-800 hover:text-white hover:bg-gray-700"
                 }`}
               >
-                スプレッドシート反映
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                SS反映
               </button>
               <a
                 href="/dashboard"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-gray-300 bg-gray-800 rounded-lg hover:text-white hover:bg-gray-700 transition-all"
               >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
                 広告データ詳細
               </a>
               <button
                 onClick={handleLogout}
-                className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
+                className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors"
               >
                 ログアウト
               </button>
@@ -517,6 +523,60 @@ export default function ProjectsPage() {
             </button>
           </div>
         )}
+
+        {/* 月次サマリー */}
+        {Object.keys(summaries).length > 0 && (() => {
+          const allSummaries = Object.values(summaries);
+          const totalSpend = allSummaries.reduce((s, v) => s + v.spend, 0);
+          const totalRevenue = allSummaries.reduce((s, v) => s + v.revenue, 0);
+          const totalCv = allSummaries.reduce((s, v) => s + v.cv, 0);
+          const totalGross = totalRevenue - totalSpend;
+          const totalRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
+          const now = new Date();
+          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          const daysSoFar = now.getDate();
+          const projectedSpend = totalSpend / daysSoFar * daysInMonth;
+          const projectedRevenue = totalRevenue / daysSoFar * daysInMonth;
+          const projectedGross = projectedRevenue - projectedSpend;
+
+          return (
+            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden mb-5">
+              <div className="px-5 py-3 bg-gray-900 text-white flex items-center justify-between">
+                <h3 className="text-sm font-semibold">{now.getMonth() + 1}月 全体サマリー</h3>
+                <span className="text-[11px] text-gray-400">{daysSoFar}日経過 / {daysInMonth}日</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 divide-x divide-gray-100">
+                <div className="px-4 py-3">
+                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">広告費</p>
+                  <p className="text-lg font-bold text-gray-900 mt-0.5">¥{Math.round(totalSpend).toLocaleString()}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">着地予測 ¥{Math.round(projectedSpend).toLocaleString()}</p>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">売上</p>
+                  <p className="text-lg font-bold text-gray-900 mt-0.5">¥{Math.round(totalRevenue).toLocaleString()}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">着地予測 ¥{Math.round(projectedRevenue).toLocaleString()}</p>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">粗利</p>
+                  <p className={`text-lg font-bold mt-0.5 ${totalGross > 0 ? "text-emerald-600" : totalGross < 0 ? "text-red-500" : "text-gray-900"}`}>
+                    ¥{Math.round(totalGross).toLocaleString()}
+                  </p>
+                  <p className={`text-[10px] mt-0.5 ${projectedGross > 0 ? "text-emerald-500" : "text-red-400"}`}>
+                    着地予測 ¥{Math.round(projectedGross).toLocaleString()}
+                  </p>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">ROAS</p>
+                  <p className="text-lg font-bold text-gray-900 mt-0.5">{(totalRoas * 100).toFixed(1)}%</p>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">総CV</p>
+                  <p className="text-lg font-bold text-gray-900 mt-0.5">{totalCv.toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {loading ? (
           <div className="space-y-4">
