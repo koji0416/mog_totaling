@@ -172,9 +172,11 @@ export async function getDateRowMap(
   sheetName: string
 ): Promise<Map<string, number>> {
   // A列を広範囲に読む (A1:A400)
+  // UNFORMATTED_VALUE: 日付をシリアル値で取得（ロケール非依存）
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: `'${sheetName}'!A1:A400`,
+    valueRenderOption: "UNFORMATTED_VALUE",
   });
 
   const rows = res.data.values || [];
