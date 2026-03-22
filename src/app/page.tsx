@@ -23,6 +23,18 @@ interface SavedProject {
   unit_price: number;
 }
 
+interface SyncResult {
+  sheetName: string;
+  status: "matched" | "skipped" | "no_match" | "no_data" | "error";
+  projectName?: string;
+  cellsWritten?: number;
+  error?: string;
+}
+
+function fmtSyncDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function ProjectsPage() {
   const [discovered, setDiscovered] = useState<DiscoveredProject[]>([]);
   const [saved, setSaved] = useState<SavedProject[]>([]);
@@ -32,8 +44,31 @@ export default function ProjectsPage() {
   const [navigating, setNavigating] = useState<string | null>(null);
   const router = useRouter();
 
+  // スプレッドシート同期
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [sheetSyncing, setSheetSyncing] = useState(false);
+  const [sheetMessage, setSheetMessage] = useState<string | null>(null);
+  const [sheetResults, setSheetResults] = useState<SyncResult[] | null>(null);
+  const [googleAuth, setGoogleAuth] = useState<boolean | null>(null);
+  const [showSheetPanel, setShowSheetPanel] = useState(false);
+
+  // 日付範囲（デフォルト: 今月1日〜今日）- hydration safe
+  const [syncSince, setSyncSince] = useState("");
+  const [syncUntil, setSyncUntil] = useState("");
+
+  useEffect(() => {
+    const now = new Date();
+    setSyncSince(fmtSyncDate(new Date(now.getFullYear(), now.getMonth(), 1)));
+    setSyncUntil(fmtSyncDate(now));
+  }, []);
+
   useEffect(() => {
     loadData();
+    // Google認証状態確認
+    fetch("/api/spreadsheet/sync")
+      .then((r) => r.json())
+      .then((d) => setGoogleAuth(d.authenticated))
+      .catch(() => setGoogleAuth(false));
   }, []);
 
   async function loadData() {
@@ -121,6 +156,57 @@ export default function ProjectsPage() {
     router.refresh();
   }
 
+  async function handleGoogleAuth() {
+    try {
+      const res = await fetch("/api/auth/google");
+      const data = await res.json();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      }
+    } catch {
+      setError("Google認証の開始に失敗しました");
+    }
+  }
+
+  async function handleSheetSync() {
+    if (!sheetUrl.trim()) {
+      setError("スプレッドシートのURLを入力してください");
+      return;
+    }
+    setSheetSyncing(true);
+    setSheetMessage(null);
+    setSheetResults(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/spreadsheet/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          spreadsheetUrl: sheetUrl,
+          since: syncSince,
+          until: syncUntil,
+        }),
+      });
+      const data = await res.json();
+      if (data.needsAuth) {
+        handleGoogleAuth();
+        return;
+      }
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setSheetMessage(
+          `${data.summary.matched}シートに${data.summary.totalCells}セルを書き込みました（未マッチ: ${data.summary.noMatch}件）`
+        );
+        setSheetResults(data.results);
+      }
+    } catch {
+      setError("スプレッドシートへの書き込みに失敗しました");
+    } finally {
+      setSheetSyncing(false);
+    }
+  }
+
   const filtered = discovered.filter((p) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
@@ -154,6 +240,16 @@ export default function ProjectsPage() {
               <h1 className="text-base font-semibold tracking-tight">MOG Totalling</h1>
             </div>
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowSheetPanel(!showSheetPanel)}
+                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                  showSheetPanel
+                    ? "text-white bg-emerald-600 hover:bg-emerald-700"
+                    : "text-gray-400 hover:text-white hover:bg-gray-800"
+                }`}
+              >
+                SS反映
+              </button>
               <a
                 href="/dashboard"
                 target="_blank"
@@ -222,6 +318,130 @@ export default function ProjectsPage() {
           </div>
         </div>
       </div>
+
+      {/* スプレッドシート反映パネル */}
+      {showSheetPanel && (
+        <div className="bg-emerald-50 border-b border-emerald-200">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-emerald-900">スプレッドシート反映</h3>
+                {googleAuth === false && (
+                  <button
+                    onClick={handleGoogleAuth}
+                    className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Googleアカウント連携
+                  </button>
+                )}
+                {googleAuth === true && (
+                  <span className="text-xs text-emerald-600 font-medium">Google連携済み</span>
+                )}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="url"
+                  value={sheetUrl}
+                  onChange={(e) => setSheetUrl(e.target.value)}
+                  placeholder="スプレッドシートのURLを貼り付け"
+                  className="flex-1 px-3 py-2 text-sm border border-emerald-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                />
+                <div className="flex gap-2 items-center">
+                  {syncSince && (
+                    <input
+                      type="date"
+                      value={syncSince}
+                      onChange={(e) => setSyncSince(e.target.value)}
+                      className="px-2 py-2 text-xs border border-emerald-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  )}
+                  <span className="text-xs text-emerald-700">〜</span>
+                  {syncUntil && (
+                    <input
+                      type="date"
+                      value={syncUntil}
+                      onChange={(e) => setSyncUntil(e.target.value)}
+                      className="px-2 py-2 text-xs border border-emerald-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  )}
+                  <button
+                    onClick={handleSheetSync}
+                    disabled={sheetSyncing || !sheetUrl.trim()}
+                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                  >
+                    {sheetSyncing ? (
+                      <>
+                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        反映中...
+                      </>
+                    ) : (
+                      "反映"
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {sheetMessage && (
+                <div className="rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-2 text-xs text-emerald-800">
+                  {sheetMessage}
+                </div>
+              )}
+
+              {sheetResults && (
+                <div className="rounded-lg border border-emerald-200 bg-white overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-emerald-800 text-white text-[11px]">
+                        <th className="px-3 py-1.5 text-left font-medium">シート名</th>
+                        <th className="px-3 py-1.5 text-left font-medium">ステータス</th>
+                        <th className="px-3 py-1.5 text-left font-medium">マッチ先</th>
+                        <th className="px-3 py-1.5 text-right font-medium">書込セル数</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sheetResults
+                        .filter((r) => r.status !== "skipped")
+                        .map((r, i) => (
+                          <tr key={i} className={`border-t border-emerald-100 ${i % 2 === 0 ? "bg-white" : "bg-emerald-50/30"}`}>
+                            <td className="px-3 py-1.5 font-medium text-gray-800 max-w-[200px] truncate">{r.sheetName}</td>
+                            <td className="px-3 py-1.5">
+                              <span
+                                className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  r.status === "matched"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : r.status === "no_match"
+                                    ? "bg-amber-100 text-amber-800"
+                                    : r.status === "error"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-gray-100 text-gray-600"
+                                }`}
+                              >
+                                {r.status === "matched"
+                                  ? "書込完了"
+                                  : r.status === "no_match"
+                                  ? "未マッチ"
+                                  : r.status === "no_data"
+                                  ? "データなし"
+                                  : r.status === "error"
+                                  ? "エラー"
+                                  : r.status}
+                              </span>
+                            </td>
+                            <td className="px-3 py-1.5 text-gray-500">{r.projectName || "-"}</td>
+                            <td className="px-3 py-1.5 text-right text-gray-600">{r.cellsWritten ?? "-"}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* メインコンテンツ */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
