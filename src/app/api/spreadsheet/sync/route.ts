@@ -83,11 +83,15 @@ export async function POST(request: NextRequest) {
       cellsWritten?: number;
       error?: string;
       debug?: {
+        biz: string;
         codesFound: number[];
         datesFound: number;
         adRows: number;
         catsRows: number;
         sampleDates: string[];
+        adUpdates: number;
+        catsUpdates: number;
+        adCode2Dates: string[];
       };
     }[] = [];
 
@@ -215,6 +219,7 @@ export async function POST(request: NextRequest) {
           await batchUpdateValues(sheets, spreadsheetId, updates);
         }
 
+        const adUpdates = updates.filter((u) => u.range.includes("ad") === false).length;
         results.push({
           sheetName,
           status: "matched",
@@ -222,11 +227,19 @@ export async function POST(request: NextRequest) {
           projectName: `${matchedProject.client_name}_${matchedProject.menu_name}`,
           cellsWritten: updates.length,
           debug: {
+            biz: matchedProject.bizmanager_name || "",
             codesFound: [...codeColMap.keys()],
             datesFound: dateRowMap.size,
             adRows: adRes.data?.length || 0,
             catsRows: catsRes.data?.length || 0,
             sampleDates: [...dateRowMap.keys()].slice(0, 3),
+            adUpdates: updates.filter((_, idx) => idx < updates.length - (catsRes.data?.length || 0) * 2).length,
+            catsUpdates: (catsRes.data?.length || 0) * 2,
+            // AD code2のdateRowマッチ状態
+            adCode2Dates: (adRes.data || [])
+              .filter((r) => r.code === 2)
+              .map((r) => `${r.date}:row${dateRowMap.get(r.date) ?? "?"}`)
+              .slice(0, 5),
           },
         });
       } catch (err) {

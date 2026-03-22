@@ -30,11 +30,15 @@ interface SyncResult {
   cellsWritten?: number;
   error?: string;
   debug?: {
+    biz: string;
     codesFound: number[];
     datesFound: number;
     adRows: number;
     catsRows: number;
     sampleDates: string[];
+    adUpdates: number;
+    catsUpdates: number;
+    adCode2Dates: string[];
   };
 }
 
@@ -442,7 +446,7 @@ export default function ProjectsPage() {
                             <td className="px-3 py-1.5 text-right text-gray-600">{r.cellsWritten ?? "-"}</td>
                             <td className="px-3 py-1.5 text-gray-400 text-[10px]">
                               {r.debug
-                                ? `コード:[${r.debug.codesFound.join(",")}] 日付:${r.debug.datesFound}行 AD:${r.debug.adRows} CATS:${r.debug.catsRows} 例:${r.debug.sampleDates.join(",")}`
+                                ? `biz:${r.debug.biz} コード:[${r.debug.codesFound.join(",")}] 日付:${r.debug.datesFound}行 AD:${r.debug.adRows}→${r.debug.adUpdates}cell CATS:${r.debug.catsRows}→${r.debug.catsUpdates}cell code2:[${r.debug.adCode2Dates.join(",")}] 例:${r.debug.sampleDates.join(",")}`
                                 : r.error || "-"}
                             </td>
                           </tr>
