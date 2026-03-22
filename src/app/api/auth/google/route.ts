@@ -18,9 +18,8 @@ export async function GET() {
 }
 
 function getRedirectUri(): string {
-  // Vercel上ならproduction URL、ローカルならlocalhost
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}/api/auth/google/callback`;
+  if (process.env.GOOGLE_REDIRECT_URI) {
+    return process.env.GOOGLE_REDIRECT_URI;
   }
   return "http://localhost:3000/api/auth/google/callback";
 }

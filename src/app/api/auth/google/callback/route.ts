@@ -8,9 +8,8 @@ export async function GET(request: NextRequest) {
     return new Response("認証コードがありません", { status: 400 });
   }
 
-  const redirectUri = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}/api/auth/google/callback`
-    : "http://localhost:3000/api/auth/google/callback";
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI
+    || "http://localhost:3000/api/auth/google/callback";
 
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -32,15 +31,13 @@ export async function GET(request: NextRequest) {
     });
 
     // 認証完了後、メインページにリダイレクト
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+      || "http://localhost:3000";
     return Response.redirect(`${baseUrl}/?google_auth=success`);
   } catch (error) {
     console.error("Google OAuth error:", error);
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+      || "http://localhost:3000";
     return Response.redirect(`${baseUrl}/?google_auth=error`);
   }
 }
