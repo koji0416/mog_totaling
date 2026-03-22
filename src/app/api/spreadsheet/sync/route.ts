@@ -82,6 +82,13 @@ export async function POST(request: NextRequest) {
       projectName?: string;
       cellsWritten?: number;
       error?: string;
+      debug?: {
+        codesFound: number[];
+        datesFound: number;
+        adRows: number;
+        catsRows: number;
+        sampleDates: string[];
+      };
     }[] = [];
 
     // 各シートを処理
@@ -214,6 +221,13 @@ export async function POST(request: NextRequest) {
           projectId: matchedProject.id,
           projectName: `${matchedProject.client_name}_${matchedProject.menu_name}`,
           cellsWritten: updates.length,
+          debug: {
+            codesFound: [...codeColMap.keys()],
+            datesFound: dateRowMap.size,
+            adRows: adRes.data?.length || 0,
+            catsRows: catsRes.data?.length || 0,
+            sampleDates: [...dateRowMap.keys()].slice(0, 3),
+          },
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "不明なエラー";

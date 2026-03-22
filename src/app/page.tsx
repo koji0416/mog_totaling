@@ -29,6 +29,13 @@ interface SyncResult {
   projectName?: string;
   cellsWritten?: number;
   error?: string;
+  debug?: {
+    codesFound: number[];
+    datesFound: number;
+    adRows: number;
+    catsRows: number;
+    sampleDates: string[];
+  };
 }
 
 function fmtSyncDate(d: Date): string {
@@ -399,6 +406,7 @@ export default function ProjectsPage() {
                         <th className="px-3 py-1.5 text-left font-medium">ステータス</th>
                         <th className="px-3 py-1.5 text-left font-medium">マッチ先</th>
                         <th className="px-3 py-1.5 text-right font-medium">書込セル数</th>
+                        <th className="px-3 py-1.5 text-left font-medium">詳細</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -432,6 +440,11 @@ export default function ProjectsPage() {
                             </td>
                             <td className="px-3 py-1.5 text-gray-500">{r.projectName || "-"}</td>
                             <td className="px-3 py-1.5 text-right text-gray-600">{r.cellsWritten ?? "-"}</td>
+                            <td className="px-3 py-1.5 text-gray-400 text-[10px]">
+                              {r.debug
+                                ? `コード:[${r.debug.codesFound.join(",")}] 日付:${r.debug.datesFound}行 AD:${r.debug.adRows} CATS:${r.debug.catsRows} 例:${r.debug.sampleDates.join(",")}`
+                                : r.error || "-"}
+                            </td>
                           </tr>
                         ))}
                     </tbody>
