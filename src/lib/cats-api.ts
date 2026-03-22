@@ -88,6 +88,12 @@ export async function login(): Promise<string> {
     redirect: "manual",
   });
 
+  // checkResで新しいcookieが発行されることがある
+  const checkFuelmid = extractFuelmid(checkRes);
+  if (checkFuelmid) {
+    fuelmid = checkFuelmid;
+  }
+
   if (checkRes.status === 302 || checkRes.status === 301) {
     throw new Error("CATSログイン失敗: 認証情報を確認してください");
   }
@@ -291,17 +297,14 @@ async function loadReportPage(cookie: string, date: string): Promise<void> {
     .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
     .join("&");
 
-  await fetch(`${BASE_URL}/admin/profilecontentmedia/list`, {
-    method: "POST",
+  await fetch(`${BASE_URL}/admin/profilecontentmedia/list?${ajaxQueryStr}`, {
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
       Cookie: cookie,
       "User-Agent": UA,
       "X-Requested-With": "XMLHttpRequest",
       Accept: "application/json, text/javascript, */*; q=0.01",
       Referer: `${BASE_URL}/admin/profilecontentmedia/list`,
     },
-    body: ajaxQueryStr,
   });
 }
 
@@ -452,4 +455,78 @@ export async function fetchCatsMediaNames(
   const text = decodeCP932(buffer);
   const rows = parseCsv(text);
   return [...new Set(rows.map((r) => r.mediaName).filter(Boolean))];
+}
+
+// 共有ピクセル（MOG_xx）の広告主マッピングをHTMLテーブルから取得
+// CSVでは広告主名が空になるため、ページHTMLから補完する
+export interface MogMapping {
+  mediaName: string;     // "MOG_01"
+  advertiserName: string; // "ピラティスK"
+  adName: string;         // "ピラティスK_初月0円_即bot_Meta"
+  clicks: number;
+  cv: number;
+}
+
+export async function fetchMogMappings(
+  since: string,
+  until: string
+): Promise<MogMapping[]> {
+  const cookie = await login();
+
+  const sinceSlash = since.replace(/-/g, "/");
+  const untilSlash = until.replace(/-/g, "/");
+  const searchDate = `${sinceSlash} - ${untilSlash}`;
+
+  // ページをGETで取得（HTMLテーブルにデータが埋め込まれている）
+  // 注: searchDateパラメータを付けると集約されてしまうため、パラメータなしで取得
+  // デフォルトでは当日のデータが表示され、広告主別に分解される
+  const pageRes = await fetch(`${BASE_URL}/admin/profilecontentmedia/list`, {
+    headers: { Cookie: cookie, "User-Agent": UA },
+  });
+  const html = await pageRes.text();
+
+  if (html.length < 10000) {
+    console.error("CATS HTMLテーブル取得失敗: ページが小さすぎます");
+    return [];
+  }
+
+  // <table id="dataTable"> の <tbody> を抽出
+  const tableIdx = html.indexOf('id="dataTable"');
+  if (tableIdx < 0) return [];
+
+  const tbodyIdx = html.indexOf("<tbody", tableIdx);
+  const tbodyEnd = html.indexOf("</tbody>", tbodyIdx);
+  if (tbodyIdx < 0 || tbodyEnd < 0) return [];
+
+  const tbodyHtml = html.substring(tbodyIdx, tbodyEnd);
+
+  // 各行をパース
+  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+  const stripTags = (s: string) => s.replace(/<[^>]*>/g, "").trim();
+
+  const mappings: MogMapping[] = [];
+
+  for (const rowMatch of tbodyHtml.matchAll(rowRegex)) {
+    const cells: string[] = [];
+    for (const tdMatch of rowMatch[1].matchAll(tdRegex)) {
+      cells.push(stripTags(tdMatch[1]));
+    }
+
+    // cells[0]=媒体名, cells[1]=カテゴリ①, cells[2]=カテゴリ②, cells[3]=広告主名, cells[4]=広告名, cells[5]=クリック数, ...cells[7]=CV
+    const mediaName = cells[0] || "";
+
+    // MOG_xx（【】がない共有ピクセル媒体）のみ抽出
+    if (mediaName.match(/^MOG_\d+$/) && cells[3]) {
+      mappings.push({
+        mediaName,
+        advertiserName: cells[3],
+        adName: cells[4] || "",
+        clicks: parseInt(cells[5]) || 0,
+        cv: parseInt(cells[7]) || 0,
+      });
+    }
+  }
+
+  return mappings;
 }

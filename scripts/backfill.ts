@@ -15,7 +15,7 @@ import * as path from "path";
 dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
 
 import { fetchAdAccounts, fetchCampaignDailyInsights } from "../src/lib/meta-api";
-import { fetchCatsMediaDaily, fetchCatsMediaNames } from "../src/lib/cats-api";
+import { fetchCatsMediaDaily, fetchCatsMediaNames, fetchMogMappings } from "../src/lib/cats-api";
 import {
   discoverProjects,
   parseCodeFromCampaignName,
@@ -74,10 +74,18 @@ async function main() {
     });
   }
 
-  // Step 3: CATSデータ一括取得（全媒体）
+  // Step 3: CATSデータ一括取得（全媒体）+ MOGマッピング
   console.log("CATSデータを取得中...");
   const catsDailyAll = await fetchCatsMediaDaily(since, until);
-  console.log(`  CATS: ${catsDailyAll.length} 行取得\n`);
+  console.log(`  CATS: ${catsDailyAll.length} 行取得`);
+
+  let mogMappings: Awaited<ReturnType<typeof fetchMogMappings>> = [];
+  try {
+    mogMappings = await fetchMogMappings(since, until);
+    console.log(`  MOGマッピング: ${mogMappings.length} 件取得\n`);
+  } catch {
+    console.log("  MOGマッピング取得失敗（スキップ）\n");
+  }
 
   // Step 4: 各案件を同期
   let synced = 0;
@@ -141,7 +149,7 @@ async function main() {
         };
       });
 
-      // daily_cats_data
+      // daily_cats_data（通常 + MOG共有ピクセル）
       const catsAggMap = new Map<
         string,
         { mcv: number; cv: number; mediaNames: string[] }
@@ -155,6 +163,23 @@ async function main() {
         existing.mcv += row.clicks;
         existing.cv += row.cv;
         existing.mediaNames.push(row.mediaName);
+        catsAggMap.set(key, existing);
+      }
+
+      // MOG共有ピクセル: 広告主名でマッチ
+      const clientName = saved.client_name.toLowerCase();
+      for (const mog of mogMappings) {
+        if (mog.advertiserName.toLowerCase() !== clientName) continue;
+        const mogCodeMatch = mog.mediaName.match(/^MOG_(\d+)$/);
+        if (!mogCodeMatch) continue;
+        const mogCode = parseInt(mogCodeMatch[1], 10);
+        const today = new Date().toISOString().split("T")[0];
+        if (today < since || today > until) continue;
+        const key = `${today}__${mogCode}`;
+        const existing = catsAggMap.get(key) || { mcv: 0, cv: 0, mediaNames: [] };
+        existing.mcv += mog.clicks;
+        existing.cv += mog.cv;
+        existing.mediaNames.push(`${mog.mediaName}(${mog.advertiserName})`);
         catsAggMap.set(key, existing);
       }
 
