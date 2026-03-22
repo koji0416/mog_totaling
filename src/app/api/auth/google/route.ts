@@ -10,7 +10,7 @@ export async function GET() {
 
   const url = oauth2Client.generateAuthUrl({
     access_type: "offline",
-    prompt: "consent",
+    prompt: "select_account consent",
     scope: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 
