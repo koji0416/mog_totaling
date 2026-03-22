@@ -119,19 +119,22 @@ function isClientMenuMatch(parsedMetaName: string, clientMenu: string): boolean 
   const aFirst = a.split("_")[0].replace(/\d+$/, "");
   const bFirst = b.split("_")[0].replace(/\d+$/, "");
   if (aFirst === bFirst && aFirst.length > 0) {
-    // 単一セグメントならクライアント名一致で十分
-    const aParts = a.split("_");
-    const bParts = b.split("_");
-    if (aParts.length === 1 || bParts.length === 1) return true;
-    // 複数セグメントなら末尾セグメントも一致を確認
-    const aLast = aParts[aParts.length - 1].replace(/\d+$/, "");
-    const bLast = bParts[bParts.length - 1].replace(/\d+$/, "");
-    if (aLast === bLast) return true;
+    const aParts2 = a.split("_");
+    const bParts2 = b.split("_");
+    // 両方単一セグメント → クライアント名一致でOK
+    if (aParts2.length === 1 && bParts2.length === 1) return true;
+    // 両方単一 → すでに上で処理済み
+    // 片方単一・片方複数 → 単一側にメニュー指定がないので、
+    // 複数側のメニューが何であってもマッチ（コードで区別される）
+    // ただし、両方複数セグメントの場合はメニュー一致を確認
+    if (aParts2.length === 1 || bParts2.length === 1) return true;
+    // 両方複数セグメント → メニュー部分の一致を確認
+    const aMenu = aParts2.slice(1).join("_").replace(/\d+$/, "");
+    const bMenu = bParts2.slice(1).join("_").replace(/\d+$/, "");
+    if (aMenu === bMenu || aMenu.includes(bMenu) || bMenu.includes(aMenu)) return true;
   }
 
   // 業種サフィックスを除去してコア名で比較
-  // 例: "リアスクリニック" → "リアス", "リアス銀座クリニック" → "リアス銀座"
-  // → "リアス銀座".includes("リアス") → true
   const suffixes = ["クリニック", "サロン", "ラボ", "エステ", "美容外科", "皮膚科"];
   const removeSuffix = (s: string) => {
     for (const sf of suffixes) {
@@ -143,13 +146,16 @@ function isClientMenuMatch(parsedMetaName: string, clientMenu: string): boolean 
   const bParts = b.split("_");
   const coreA = removeSuffix(aParts[0]);
   const coreB = removeSuffix(bParts[0]);
-  if (coreA.length >= 2 && coreB.length >= 2) {
+
+  // コア名が短すぎる場合は誤マッチ防止（"エル","東京"等）
+  const shorter = coreA.length <= coreB.length ? coreA : coreB;
+  const longer = coreA.length > coreB.length ? coreA : coreB;
+  if (shorter.length >= 3 && (shorter.length / longer.length) >= 0.5) {
     if (coreA.includes(coreB) || coreB.includes(coreA)) {
-      // クライアント名が一致しても、両方にメニュー部分がある場合はメニューも確認
+      // 両方にメニュー部分がある場合はメニューも確認
       if (aParts.length >= 2 && bParts.length >= 2) {
         const aMenu = aParts.slice(1).join("_").replace(/\d+$/, "");
         const bMenu = bParts.slice(1).join("_").replace(/\d+$/, "");
-        // メニューが完全に異なる場合は不一致
         if (aMenu !== bMenu && !aMenu.includes(bMenu) && !bMenu.includes(aMenu)) {
           return false;
         }
