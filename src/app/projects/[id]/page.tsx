@@ -488,7 +488,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <th className="px-3 py-2.5 text-right font-medium">ROAS</th>
                     <th className="px-3 py-2.5 text-right font-medium">粗利</th>
                     <th className="px-3 py-2.5 text-right font-medium text-yellow-300">広告費</th>
-                    <th className="px-3 py-2.5 text-right font-medium">売上</th>
+                    <th className="px-3 py-2.5 text-right font-medium">売上 <span className="text-blue-300 text-[9px] font-normal">編集可</span></th>
                     <th className="px-3 py-2.5 text-right font-medium">CPC</th>
                     <th className="px-3 py-2.5 text-right font-medium">CPM</th>
                     <th className="px-3 py-2.5 text-right font-medium text-yellow-300">imp</th>
@@ -531,7 +531,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         </td>
                         <td className="px-3 py-2 text-right font-medium">{fmtYen(r.spend)}</td>
                         <td
-                          className={`px-3 py-2 text-right cursor-pointer hover:bg-yellow-50 ${hasOverride ? "text-blue-600 underline decoration-dotted" : ""}`}
+                          className={`px-3 py-2 text-right cursor-pointer group/rev hover:bg-blue-50 border-l border-dashed border-blue-200 ${hasOverride ? "text-blue-600" : ""}`}
                           onClick={() => { setEditingRevDate(r.date); setRevInput(revenue > 0 ? String(Math.round(revenue)) : ""); }}
                         >
                           {editingRevDate === r.date ? (
@@ -545,7 +545,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                               autoFocus
                             />
                           ) : (
-                            fmtYen(revenue)
+                            <span className="inline-flex items-center gap-1">
+                              {fmtYen(revenue)}
+                              <svg className="w-2.5 h-2.5 text-gray-300 group-hover/rev:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </span>
                           )}
                         </td>
                         <td className="px-3 py-2 text-right">{fmtYen(cpc)}</td>

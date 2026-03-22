@@ -44,6 +44,13 @@ export default function ProjectsPage() {
   const [navigating, setNavigating] = useState<string | null>(null);
   const router = useRouter();
 
+  // 単価インライン編集
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [priceInput, setPriceInput] = useState("");
+
+  // 当月サマリー
+  const [summaries, setSummaries] = useState<Record<string, { spend: number; revenue: number; cv: number }>>({});
+
   // スプレッドシート同期
   const [sheetUrl, setSheetUrl] = useState("");
   const [sheetSyncing, setSheetSyncing] = useState(false);
@@ -84,6 +91,29 @@ export default function ProjectsPage() {
       if (discoverData.error) setError(discoverData.error);
       else setDiscovered(discoverData.projects || []);
       setSaved(savedData.projects || []);
+
+      // 当月サマリーを取得
+      const projects = savedData.projects || [];
+      if (projects.length > 0) {
+        const now = new Date();
+        const mSince = fmtSyncDate(new Date(now.getFullYear(), now.getMonth(), 1));
+        const mUntil = fmtSyncDate(now);
+        const summaryPromises = projects.map(async (p: SavedProject) => {
+          try {
+            const res = await fetch(`/api/projects/totalling?projectId=${p.id}&since=${mSince}&until=${mUntil}`);
+            const data = await res.json();
+            const rows = data.rows || [];
+            const spend = rows.reduce((s: number, r: { spend: number }) => s + r.spend, 0);
+            const cv = rows.reduce((s: number, r: { cv: number }) => s + r.cv, 0);
+            const revenue = cv * (p.unit_price || 0);
+            return [p.id, { spend, revenue, cv }] as const;
+          } catch {
+            return [p.id, { spend: 0, revenue: 0, cv: 0 }] as const;
+          }
+        });
+        const results = await Promise.all(summaryPromises);
+        setSummaries(Object.fromEntries(results));
+      }
     } catch {
       setError("データの取得に失敗しました");
     } finally {
@@ -154,6 +184,32 @@ export default function ProjectsPage() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
+  }
+
+  async function saveInlinePrice(projectId: string) {
+    const sv = saved.find((s) => s.id === projectId);
+    if (!sv) return;
+    const newPrice = Number(priceInput) || 0;
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_name: sv.client_name,
+          menu_name: sv.menu_name,
+          platform: sv.platform,
+          bizmanager_name: sv.bizmanager_name,
+          meta_account_id: sv.meta_account_id,
+          unit_price: newPrice,
+          approval_rate: 1.0,
+        }),
+      });
+      const data = await res.json();
+      if (!data.error) {
+        setSaved((prev) => prev.map((s) => s.id === projectId ? { ...s, unit_price: newPrice } : s));
+      }
+    } catch { /* ignore */ }
+    setEditingPriceId(null);
   }
 
   async function handleGoogleAuth() {
@@ -243,7 +299,7 @@ export default function ProjectsPage() {
               <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center font-bold text-sm">
                 M
               </div>
-              <h1 className="text-base font-semibold tracking-tight">MOG Totalling</h1>
+              <h1 className="text-base font-semibold tracking-tight">MOG 集計</h1>
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -497,16 +553,17 @@ export default function ProjectsPage() {
                     const sv = findSaved(p);
                     const menuName = p.clientMenu.split("_").slice(1).join("_");
                     const isNav = navigating === key;
+                    const summary = sv ? summaries[sv.id] : undefined;
+                    const grossProfit = summary ? summary.revenue - summary.spend : 0;
 
                     return (
-                      <button
-                        key={key}
-                        onClick={() => handleClick(p)}
-                        disabled={!!navigating}
-                        className="w-full text-left px-5 py-4 hover:bg-blue-50/50 transition-all disabled:opacity-60 group"
-                      >
+                      <div key={key} className="px-5 py-3 hover:bg-blue-50/30 transition-all group">
                         <div className="flex items-center justify-between">
-                          <div className="min-w-0 flex-1">
+                          <button
+                            onClick={() => handleClick(p)}
+                            disabled={!!navigating}
+                            className="min-w-0 flex-1 text-left disabled:opacity-60"
+                          >
                             <div className="flex items-center gap-2.5">
                               <span
                                 className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold rounded-md ${
@@ -520,31 +577,62 @@ export default function ProjectsPage() {
                               <span className="text-sm font-semibold text-gray-900">{menuName}</span>
                               <span className="text-xs text-gray-400 font-medium">{p.bizmanager}</span>
                             </div>
-                            <div className="flex items-center gap-4 mt-1.5">
-                              <span className="text-xs text-gray-400">コード {p.codes.join(", ")}</span>
-                              {sv && sv.unit_price > 0 ? (
-                                <span className="text-xs font-medium text-emerald-600">
-                                  単価 ¥{sv.unit_price.toLocaleString()}
+                          </button>
+                          <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+                            {/* 当月サマリー */}
+                            {summary && summary.spend > 0 && (
+                              <div className="hidden sm:flex items-center gap-3 text-[11px]">
+                                <span className="text-gray-400">広告費 <span className="text-gray-700 font-medium">¥{Math.round(summary.spend).toLocaleString()}</span></span>
+                                <span className="text-gray-400">CV <span className="text-gray-700 font-medium">{summary.cv}</span></span>
+                                <span className={`font-medium ${grossProfit > 0 ? "text-emerald-600" : grossProfit < 0 ? "text-red-500" : "text-gray-400"}`}>
+                                  粗利 ¥{Math.round(grossProfit).toLocaleString()}
                                 </span>
-                              ) : (
-                                <span className="text-xs text-amber-500 font-medium">単価未設定</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex-shrink-0 ml-4">
+                              </div>
+                            )}
                             {isNav ? (
-                              <svg className="w-5 h-5 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                               </svg>
                             ) : (
-                              <svg className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
+                              <button
+                                onClick={() => handleClick(p)}
+                                disabled={!!navigating}
+                                className="p-1"
+                              >
+                                <svg className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </button>
                             )}
                           </div>
                         </div>
-                      </button>
+                        {/* 下段: コード + 単価 */}
+                        <div className="flex items-center gap-4 mt-1">
+                          <span className="text-xs text-gray-400">コード {p.codes.join(", ")}</span>
+                          {sv && editingPriceId === sv.id ? (
+                            <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-xs text-gray-400">単価 ¥</span>
+                              <input
+                                type="number"
+                                value={priceInput}
+                                onChange={(e) => setPriceInput(e.target.value)}
+                                onBlur={() => saveInlinePrice(sv.id)}
+                                onKeyDown={(e) => { if (e.key === "Enter") saveInlinePrice(sv.id); if (e.key === "Escape") setEditingPriceId(null); }}
+                                className="w-20 text-xs border border-blue-400 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                autoFocus
+                              />
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); if (sv) { setEditingPriceId(sv.id); setPriceInput(String(sv.unit_price || "")); } }}
+                              className={`text-xs font-medium ${sv && sv.unit_price > 0 ? "text-emerald-600 hover:text-emerald-700" : "text-amber-500 hover:text-amber-600"}`}
+                            >
+                              {sv && sv.unit_price > 0 ? `単価 ¥${sv.unit_price.toLocaleString()}` : "単価未設定"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
