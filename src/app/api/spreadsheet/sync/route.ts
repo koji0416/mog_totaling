@@ -2,6 +2,16 @@ import { type NextRequest } from "next/server";
 import { google } from "googleapis";
 import { cookies } from "next/headers";
 import { createServerSupabase } from "@/lib/supabase";
+import { fetchCampaignDailyInsights } from "@/lib/meta-api";
+import { fetchCatsMediaDaily } from "@/lib/cats-api";
+import {
+  parseCodeFromCampaignName,
+  parseCatsMediaName,
+  discoverProjects,
+  type DiscoveredProject,
+} from "@/lib/project-matcher";
+import { fetchAdAccounts } from "@/lib/meta-api";
+import { fetchCatsMediaNames } from "@/lib/cats-api";
 import {
   createOAuth2Client,
   extractSpreadsheetId,
@@ -25,7 +35,7 @@ export async function GET() {
   return Response.json({ authenticated: !!tokensCookie });
 }
 
-// POST: スプレッドシートにデータを書き込み
+// POST: 全案件同期 → スプレッドシート書き込み
 export async function POST(request: NextRequest) {
   try {
     const { spreadsheetUrl, since, until } = await request.json();
@@ -60,14 +70,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // シート名一覧取得
-    const sheetList = await getSheetList(sheets, spreadsheetId);
-    const sheetNames = sheetList.map((s) => s.title);
-    const sheetIdMap = new Map(sheetList.map((s) => [s.title, s.sheetId]));
-
-    // Supabaseから全プロジェクト取得
     const supabase = createServerSupabase();
-    const { data: projects, error: projError } = await supabase
+
+    // ===== Step 1: 案件自動検出 =====
+    const [metaAccounts, catsMediaNamesList] = await Promise.all([
+      fetchAdAccounts(),
+      fetchCatsMediaNames(since, until),
+    ]);
+    const discoveredProjects = discoverProjects(metaAccounts, catsMediaNamesList);
+
+    // Supabaseの保存済みプロジェクトを取得
+    const { data: savedProjects, error: projError } = await supabase
       .from("projects")
       .select("*");
 
@@ -75,44 +88,160 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: projError.message }, { status: 500 });
     }
 
+    // discoveredProject → savedProject のマッピングを作成
+    function findSavedProject(dp: DiscoveredProject) {
+      const expectedClientMenu = dp.clientMenu;
+      return (savedProjects || []).find((s) => {
+        const savedCM = s.menu_name && s.menu_name !== "-"
+          ? s.client_name + "_" + s.menu_name
+          : s.client_name;
+        return (
+          savedCM === expectedClientMenu &&
+          (s.bizmanager_name || "").toLowerCase() === dp.bizmanager.toLowerCase() &&
+          s.platform === dp.platform
+        );
+      });
+    }
+
+    // ===== Step 2: 全案件のMeta/CATSデータ同期 =====
+    // CATSは日付範囲に対して1回だけ取得（全媒体分が返る）
+    const catsDailyAll = await fetchCatsMediaDaily(since, until);
+
+    let syncedCount = 0;
+    let syncErrors: string[] = [];
+
+    for (const dp of discoveredProjects) {
+      const saved = findSavedProject(dp);
+      if (!saved) continue;
+
+      try {
+        // Meta API取得
+        const accountIds = dp.metaAccountIds;
+        const metaCampaignDailyArrays = accountIds.length > 0
+          ? await Promise.all(accountIds.map((id) => fetchCampaignDailyInsights(id, since, until)))
+          : [];
+        const metaCampaignDaily = metaCampaignDailyArrays.flat();
+
+        // CATS媒体名→コード番号マップ
+        const catsNameToCode = new Map<string, number>();
+        for (const name of dp.catsMediaNames) {
+          const parsed = parseCatsMediaName(name);
+          if (parsed) catsNameToCode.set(name, parsed.code);
+        }
+        const catsMediaSet = new Set(dp.catsMediaNames);
+
+        // --- daily_ad_data に保存 ---
+        const adAggMap = new Map<
+          string,
+          { spend: number; impressions: number; clicks: number; campaignNames: string[] }
+        >();
+
+        for (const row of metaCampaignDaily) {
+          const code = parseCodeFromCampaignName(row.campaignName);
+          if (code === null || !dp.codes.includes(code)) continue;
+          const key = `${row.date}__${code}`;
+          const existing = adAggMap.get(key) || { spend: 0, impressions: 0, clicks: 0, campaignNames: [] };
+          existing.spend += row.spend;
+          existing.impressions += row.impressions;
+          existing.clicks += row.clicks;
+          existing.campaignNames.push(row.campaignName);
+          adAggMap.set(key, existing);
+        }
+
+        const adRows = [...adAggMap.entries()].map(([key, val]) => {
+          const [date, codeStr] = key.split("__");
+          return {
+            project_id: saved.id,
+            date,
+            code: parseInt(codeStr, 10),
+            spend: val.spend,
+            impressions: val.impressions,
+            clicks: val.clicks,
+            campaign_name: val.campaignNames.join(" / "),
+          };
+        });
+
+        const adDates = [...new Set(adRows.map((r) => r.date))];
+        for (const date of adDates) {
+          await supabase.from("daily_ad_data").delete()
+            .eq("project_id", saved.id).eq("date", date);
+        }
+        for (let i = 0; i < adRows.length; i += 50) {
+          await supabase.from("daily_ad_data").insert(adRows.slice(i, i + 50));
+        }
+
+        // --- daily_cats_data に保存 ---
+        const catsAggMap = new Map<string, { mcv: number; cv: number; mediaNames: string[] }>();
+        for (const row of catsDailyAll) {
+          if (!catsMediaSet.has(row.mediaName)) continue;
+          const code = catsNameToCode.get(row.mediaName);
+          if (code === undefined) continue;
+          const key = `${row.date}__${code}`;
+          const existing = catsAggMap.get(key) || { mcv: 0, cv: 0, mediaNames: [] };
+          existing.mcv += row.clicks; // CATSの「クリック数」= MCV
+          existing.cv += row.cv;
+          existing.mediaNames.push(row.mediaName);
+          catsAggMap.set(key, existing);
+        }
+
+        const catsRows = [...catsAggMap.entries()].map(([key, val]) => {
+          const [date, codeStr] = key.split("__");
+          return {
+            project_id: saved.id,
+            date,
+            code: parseInt(codeStr, 10),
+            mcv: val.mcv,
+            cv: val.cv,
+            media_name: val.mediaNames.join(" / "),
+          };
+        });
+
+        const catsDates = [...new Set(catsRows.map((r) => r.date))];
+        for (const date of catsDates) {
+          await supabase.from("daily_cats_data").delete()
+            .eq("project_id", saved.id).eq("date", date);
+        }
+        for (let i = 0; i < catsRows.length; i += 50) {
+          await supabase.from("daily_cats_data").insert(catsRows.slice(i, i + 50));
+        }
+
+        syncedCount++;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "不明なエラー";
+        syncErrors.push(`${dp.clientMenu}: ${msg}`);
+      }
+    }
+
+    // ===== Step 3: スプレッドシートに書き込み =====
+    const sheetList = await getSheetList(sheets, spreadsheetId);
+    const sheetNames = sheetList.map((s) => s.title);
+    const sheetIdMap = new Map(sheetList.map((s) => [s.title, s.sheetId]));
+
+    // プロジェクト一覧を再取得（同期後の最新データを使うため）
+    const { data: freshProjects } = await supabase.from("projects").select("*");
+
     const results: {
       sheetName: string;
       status: "matched" | "skipped" | "no_match" | "no_data" | "error";
-      projectId?: string;
       projectName?: string;
       cellsWritten?: number;
       error?: string;
-      debug?: {
-        biz: string;
-        codesFound: number[];
-        datesFound: number;
-        adRows: number;
-        catsRows: number;
-        sampleDates: string[];
-        adUpdates: number;
-        catsUpdates: number;
-        adCode2Dates: string[];
-      };
     }[] = [];
 
-    // 各シートを処理
     for (const sheetName of sheetNames) {
-      // スキップ判定
       if (shouldSkipSheet(sheetName)) {
         results.push({ sheetName, status: "skipped" });
         continue;
       }
 
-      // シート名パース
       const parsed = parseSheetName(sheetName);
       if (!parsed) {
         results.push({ sheetName, status: "no_match" });
         continue;
       }
 
-      // プロジェクトマッチング
       const matchedProject = findMatchingProject(
-        projects || [],
+        freshProjects || [],
         parsed.clientName,
         parsed.menuName,
         parsed.bizmanagerName,
@@ -125,31 +254,16 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        // コード列マッピング取得
-        const codeColMap = await getCodeColumnMap(
-          sheets,
-          spreadsheetId,
-          sheetName
-        );
-
+        const codeColMap = await getCodeColumnMap(sheets, spreadsheetId, sheetName);
         if (codeColMap.size === 0) {
           results.push({
-            sheetName,
-            status: "no_data",
-            projectId: matchedProject.id,
+            sheetName, status: "no_data",
             projectName: `${matchedProject.client_name}_${matchedProject.menu_name}`,
           });
           continue;
         }
 
-        // 日付→行マッピング取得
-        const dateRowMap = await getDateRowMap(
-          sheets,
-          spreadsheetId,
-          sheetName
-        );
-
-        // Supabaseからコード別日別データ取得
+        const dateRowMap = await getDateRowMap(sheets, spreadsheetId, sheetName);
         const codes = [...codeColMap.keys()];
 
         const [adRes, catsRes] = await Promise.all([
@@ -171,76 +285,51 @@ export async function POST(request: NextRequest) {
 
         if (adRes.error || catsRes.error) {
           results.push({
-            sheetName,
-            status: "error",
+            sheetName, status: "error",
             error: adRes.error?.message || catsRes.error?.message,
           });
           continue;
         }
 
-        // セル更新リスト作成
         const updates: CellUpdate[] = [];
         const sid = sheetIdMap.get(sheetName) || 0;
 
-        // ヘルパー: CellUpdateを作成
         function addUpdate(col: number, dateRow: number, value: number) {
           updates.push({
             range: `'${sheetName}'!${colToLetter(col)}${dateRow}`,
             value,
             sheetId: sid,
-            row: dateRow - 1, // 0-based
-            col,              // 0-based
+            row: dateRow - 1,
+            col,
           });
         }
 
-        // 広告データ（コード×日別）
         for (const row of adRes.data || []) {
           const dateRow = dateRowMap.get(row.date);
           const codeCol = codeColMap.get(row.code);
           if (dateRow === undefined || codeCol === undefined) continue;
-
           addUpdate(codeCol + CODE_SECTION_OFFSETS.adSpend, dateRow, Math.round(row.spend));
           addUpdate(codeCol + CODE_SECTION_OFFSETS.imp, dateRow, row.impressions);
           addUpdate(codeCol + CODE_SECTION_OFFSETS.clicks, dateRow, row.clicks);
         }
 
-        // CATSデータ（コード×日別）
         for (const row of catsRes.data || []) {
           const dateRow = dateRowMap.get(row.date);
           const codeCol = codeColMap.get(row.code);
           if (dateRow === undefined || codeCol === undefined) continue;
-
           addUpdate(codeCol + CODE_SECTION_OFFSETS.mcv, dateRow, row.mcv);
           addUpdate(codeCol + CODE_SECTION_OFFSETS.cv, dateRow, row.cv);
         }
 
-        // バッチ書き込み
         if (updates.length > 0) {
           await batchUpdateValues(sheets, spreadsheetId, updates);
         }
 
-        const adUpdates = updates.filter((u) => u.range.includes("ad") === false).length;
         results.push({
           sheetName,
           status: "matched",
-          projectId: matchedProject.id,
           projectName: `${matchedProject.client_name}_${matchedProject.menu_name}`,
           cellsWritten: updates.length,
-          debug: {
-            biz: matchedProject.bizmanager_name || "",
-            codesFound: [...codeColMap.keys()],
-            datesFound: dateRowMap.size,
-            adRows: adRes.data?.length || 0,
-            catsRows: catsRes.data?.length || 0,
-            sampleDates: [...dateRowMap.keys()].slice(0, 3),
-            adUpdates: updates.filter((_, idx) => idx < updates.length - (catsRes.data?.length || 0) * 2).length,
-            catsUpdates: (catsRes.data?.length || 0) * 2,
-            // AD code2のdateRowマッチ状態
-            adCode2Dates: (adRes.data || [])
-              .filter((r) => r.code === 2)
-              .map((r) => `${r.date}:row${dateRowMap.get(r.date) ?? "?"}`)
-              .slice(0, 5),
-          },
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "不明なエラー";
@@ -249,7 +338,6 @@ export async function POST(request: NextRequest) {
     }
 
     const matched = results.filter((r) => r.status === "matched");
-    const noMatch = results.filter((r) => r.status === "no_match");
 
     return Response.json({
       success: true,
@@ -257,10 +345,13 @@ export async function POST(request: NextRequest) {
         total: sheetNames.length,
         matched: matched.length,
         skipped: results.filter((r) => r.status === "skipped").length,
-        noMatch: noMatch.length,
+        noMatch: results.filter((r) => r.status === "no_match").length,
         errors: results.filter((r) => r.status === "error").length,
         totalCells: matched.reduce((sum, r) => sum + (r.cellsWritten || 0), 0),
+        syncedProjects: syncedCount,
+        syncErrors: syncErrors.length,
       },
+      syncErrors: syncErrors.length > 0 ? syncErrors : undefined,
       results,
     });
   } catch (error) {
@@ -272,7 +363,6 @@ export async function POST(request: NextRequest) {
 }
 
 // プロジェクトマッチング
-// シート名から抽出した情報をSupabaseのprojectsと照合
 function findMatchingProject(
   projects: Array<{
     id: string;
@@ -286,7 +376,6 @@ function findMatchingProject(
   bizmanagerName: string | null,
   platform: string
 ) {
-  // 正規化関数
   const normalize = (s: string | null | undefined) =>
     (s || "").toLowerCase().replace(/\d+$/, "").trim();
 
@@ -300,14 +389,10 @@ function findMatchingProject(
   };
 
   for (const p of projects) {
-    // プラットフォーム一致チェック
     if (p.platform !== platform) continue;
 
-    // ビジマネ名チェック
     const pBiz = normalize(p.bizmanager_name);
     const sBiz = normalize(bizmanagerName);
-
-    // ビジマネ名が両方空 or 一致
     const bizMatch =
       (!pBiz && !sBiz) ||
       pBiz === sBiz ||
@@ -315,10 +400,8 @@ function findMatchingProject(
       sBiz.includes(pBiz);
     if (!bizMatch) continue;
 
-    // クライアント名チェック
     const pClient = p.client_name.toLowerCase();
     const sClient = clientName.toLowerCase();
-
     const clientMatch =
       pClient === sClient ||
       pClient.includes(sClient) ||
@@ -330,14 +413,9 @@ function findMatchingProject(
           removeSuffix(sClient).includes(removeSuffix(pClient))));
     if (!clientMatch) continue;
 
-    // メニュー名チェック
     const pMenu = (p.menu_name || "-").toLowerCase();
     const sMenu = (menuName || "").toLowerCase();
-
-    // メニューなしのケース
-    if (!sMenu || sMenu === "-" || !pMenu || pMenu === "-") {
-      return p; // クライアント+ビジマネが一致すればOK
-    }
+    if (!sMenu || sMenu === "-" || !pMenu || pMenu === "-") return p;
 
     const menuMatch =
       pMenu === sMenu ||

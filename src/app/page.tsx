@@ -29,17 +29,6 @@ interface SyncResult {
   projectName?: string;
   cellsWritten?: number;
   error?: string;
-  debug?: {
-    biz: string;
-    codesFound: number[];
-    datesFound: number;
-    adRows: number;
-    catsRows: number;
-    sampleDates: string[];
-    adUpdates: number;
-    catsUpdates: number;
-    adCode2Dates: string[];
-  };
 }
 
 function fmtSyncDate(d: Date): string {
@@ -206,9 +195,15 @@ export default function ProjectsPage() {
       if (data.error) {
         setError(data.error);
       } else {
+        const syncInfo = data.summary.syncedProjects !== undefined
+          ? `${data.summary.syncedProjects}案件同期 → `
+          : "";
         setSheetMessage(
-          `${data.summary.matched}シートに${data.summary.totalCells}セルを書き込みました（未マッチ: ${data.summary.noMatch}件）`
+          `${syncInfo}${data.summary.matched}シートに${data.summary.totalCells}セルを書き込みました（未マッチ: ${data.summary.noMatch}件）`
         );
+        if (data.syncErrors?.length > 0) {
+          setError(`同期エラー: ${data.syncErrors.join(", ")}`);
+        }
         setSheetResults(data.results);
       }
     } catch {
@@ -410,7 +405,6 @@ export default function ProjectsPage() {
                         <th className="px-3 py-1.5 text-left font-medium">ステータス</th>
                         <th className="px-3 py-1.5 text-left font-medium">マッチ先</th>
                         <th className="px-3 py-1.5 text-right font-medium">書込セル数</th>
-                        <th className="px-3 py-1.5 text-left font-medium">詳細</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -444,11 +438,6 @@ export default function ProjectsPage() {
                             </td>
                             <td className="px-3 py-1.5 text-gray-500">{r.projectName || "-"}</td>
                             <td className="px-3 py-1.5 text-right text-gray-600">{r.cellsWritten ?? "-"}</td>
-                            <td className="px-3 py-1.5 text-gray-400 text-[10px]">
-                              {r.debug
-                                ? `biz:${r.debug.biz} コード:[${r.debug.codesFound.join(",")}] 日付:${r.debug.datesFound}行 AD:${r.debug.adRows}→${r.debug.adUpdates}cell CATS:${r.debug.catsRows}→${r.debug.catsUpdates}cell code2:[${r.debug.adCode2Dates.join(",")}] 例:${r.debug.sampleDates.join(",")}`
-                                : r.error || "-"}
-                            </td>
                           </tr>
                         ))}
                     </tbody>
