@@ -534,33 +534,33 @@ export default function ProjectsPage() {
           const totalRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
           const now = new Date();
           return (
-            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden mb-5">
-              <div className="px-5 py-3 bg-gray-900 text-white flex items-center justify-between">
-                <h3 className="text-sm font-semibold">{now.getMonth() + 1}月 全体サマリー</h3>
-                <span className="text-[11px] text-gray-400">当月実績</span>
+            <div className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/20 p-5 mb-5 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold">{now.getMonth() + 1}月 全体サマリー</h3>
+                <span className="text-xs text-blue-200">当月実績</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-5 divide-x divide-gray-100">
-                <div className="px-4 py-3">
-                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">広告費</p>
-                  <p className="text-lg font-bold text-gray-900 mt-0.5">¥{Math.round(totalSpend).toLocaleString()}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                <div>
+                  <p className="text-[10px] text-blue-200 font-medium uppercase tracking-wider">広告費</p>
+                  <p className="text-xl font-bold mt-1">¥{Math.round(totalSpend).toLocaleString()}</p>
                 </div>
-                <div className="px-4 py-3">
-                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">売上</p>
-                  <p className="text-lg font-bold text-gray-900 mt-0.5">¥{Math.round(totalRevenue).toLocaleString()}</p>
+                <div>
+                  <p className="text-[10px] text-blue-200 font-medium uppercase tracking-wider">売上</p>
+                  <p className="text-xl font-bold mt-1">¥{Math.round(totalRevenue).toLocaleString()}</p>
                 </div>
-                <div className="px-4 py-3">
-                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">粗利</p>
-                  <p className={`text-lg font-bold mt-0.5 ${totalGross > 0 ? "text-emerald-600" : totalGross < 0 ? "text-red-500" : "text-gray-900"}`}>
+                <div>
+                  <p className="text-[10px] text-blue-200 font-medium uppercase tracking-wider">粗利</p>
+                  <p className={`text-xl font-bold mt-1 ${totalGross < 0 ? "text-red-300" : ""}`}>
                     ¥{Math.round(totalGross).toLocaleString()}
                   </p>
                 </div>
-                <div className="px-4 py-3">
-                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">ROAS</p>
-                  <p className="text-lg font-bold text-gray-900 mt-0.5">{(totalRoas * 100).toFixed(1)}%</p>
+                <div>
+                  <p className="text-[10px] text-blue-200 font-medium uppercase tracking-wider">ROAS</p>
+                  <p className="text-xl font-bold mt-1">{(totalRoas * 100).toFixed(1)}%</p>
                 </div>
-                <div className="px-4 py-3">
-                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">総CV</p>
-                  <p className="text-lg font-bold text-gray-900 mt-0.5">{totalCv.toLocaleString()}</p>
+                <div>
+                  <p className="text-[10px] text-blue-200 font-medium uppercase tracking-wider">総CV</p>
+                  <p className="text-xl font-bold mt-1">{totalCv.toLocaleString()}</p>
                 </div>
               </div>
             </div>
