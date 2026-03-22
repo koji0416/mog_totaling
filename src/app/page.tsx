@@ -177,7 +177,9 @@ export default function ProjectsPage() {
       }
     }
 
-    router.push(`/projects/${sv!.id}`);
+    // 別タブで開く（戻っても一覧が保持される）
+    window.open(`/projects/${sv!.id}`, "_blank");
+    setNavigating(null);
   }
 
   async function handleLogout() {
