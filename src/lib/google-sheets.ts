@@ -153,8 +153,12 @@ export async function getCodeColumnMap(
   const row = res.data.values?.[0] || [];
   const codeToCol = new Map<number, number>(); // code番号 → 0-based column index
 
+  // 全角数字→半角数字に変換
+  const toHalfWidth = (s: string) =>
+    s.replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+
   for (let i = 0; i < row.length; i++) {
-    const val = String(row[i] || "");
+    const val = toHalfWidth(String(row[i] || "").trim());
     const match = val.match(/^コード(\d+)$/);
     if (match) {
       codeToCol.set(parseInt(match[1], 10), i); // 0-based
