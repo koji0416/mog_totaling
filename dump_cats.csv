@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+    <title>ログイン</title>
+    <link rel="shortcut icon" href="https://ad.ad-mogra.com/assets/img/admin/favicon/67/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="https://ad.ad-mogra.com/assets/img/admin/favicon/67/favicon.ico" type="image/x-icon">
+    	<script type="text/javascript" src="https://ad.ad-mogra.com/assets/js/admin/jquery-3.2.1.min.js?1773735829"></script>
+
+    	<link type="text/css" rel="stylesheet" href="https://ad.ad-mogra.com/assets/css/admin/font-awesome.min.css?1773735829" />
+
+
+    <!-- bootstrap -->
+    	<link type="text/css" rel="stylesheet" href="https://ad.ad-mogra.com/assets/css/bootstrap.min.css?1773735829" />
+
+
+    <!-- adminLTE style -->
+    	<link type="text/css" rel="stylesheet" href="https://ad.ad-mogra.com/assets/css/AdminLTE.min.css?1773735829" />
+
+    	<link type="text/css" rel="stylesheet" href="https://ad.ad-mogra.com/assets/css/skins/skin-blue.min.css?1773735829" />
+
+
+    <!-- daterange picker -->
+    	<link type="text/css" rel="stylesheet" href="https://ad.ad-mogra.com/assets/css/plugins/daterangepicker/daterangepicker.css?1773735829" />
+
+
+    <!-- original -->
+    	<link type="text/css" rel="stylesheet" href="https://ad.ad-mogra.com/assets/css/login.css?1773735829" />
+
+
+    <!-- bootstrap js -->
+    	<script type="text/javascript" src="https://ad.ad-mogra.com/assets/js/bootstrap.min.js?1773735829"></script>
+
+
+    <!-- adminLTE style js -->
+    	<script type="text/javascript" src="https://ad.ad-mogra.com/assets/js/app.js?1773735829"></script>
+
+
+    <!-- daterange picker -->
+    	<script type="text/javascript" src="https://ad.ad-mogra.com/assets/js/plugins/daterangepicker/moment.min.js?1773735829"></script>
+
+    	<script type="text/javascript" src="https://ad.ad-mogra.com/assets/js/plugins/daterangepicker/daterangepicker.js?1773735829"></script>
+
+</head>
+<body class="hold-transition login-page login-page-extend">
+	    <div class="container">
+        <div class="login-box login-box-extend">
+            <div class="login-box-body login-box-body-extend">
+
+                
+                <form action="https://ad.ad-mogra.com/front/login/confirm" method="post" class="form-horizontal">
+                    <div class="form-group has-feedback form-group-lg">
+                        <div class="col-xs-10 col-xs-offset-1">
+                            <input type="text" name="loginId" value="" class="form-control input-lg" placeholder="ログインID">
+                        </div>
+                    </div>
+                    <div class="form-group has-feedback form-group-lg">
+                        <div class="col-xs-10 col-xs-offset-1">
+                            <input type="password" name="password" class="form-control input-lg" placeholder="パスワード">
+                        </div>
+                    </div>
+                    <div class="form-group form-group-lg">
+                        <div class="col-xs-6 col-xs-offset-3">
+                            <button type="submit" class="btn btn-primary btn-block btn-flat btn-lg">ログイン</button>
+                        </div>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-B59Q3YRS65"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-B59Q3YRS65');
+</script>
+</body>
+</html>

@@ -254,6 +254,7 @@ export async function POST(request: NextRequest) {
       projectName?: string;
       cellsWritten?: number;
       error?: string;
+      debug?: string;
     }[] = [];
 
     for (const sheetName of sheetNames) {
@@ -342,6 +343,7 @@ export async function POST(request: NextRequest) {
           sheetName, status: "matched",
           projectName: `${matchedSaved.client_name}_${matchedSaved.menu_name}`,
           cellsWritten: updates.length,
+          debug: updates.length === 0 ? `codes:[${codes}] dates:${dateRowMap.size} ad:${adRes.data?.length} cats:${catsRes.data?.length} sample:[${[...dateRowMap.keys()].slice(0,3)}]` : undefined,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "不明なエラー";

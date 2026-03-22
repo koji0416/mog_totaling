@@ -31,7 +31,7 @@ function extractFuelmid(res: Response): string | null {
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36";
 
 // ログインしてセッションCookieを取得
-async function login(): Promise<string> {
+export async function login(): Promise<string> {
   const { loginId, password } = getCredentials();
 
   // Step 1: ログインページにGETして初期セッションCookieを取得
@@ -257,9 +257,9 @@ async function loadReportPage(cookie: string, date: string): Promise<void> {
     },
   });
 
-  // Step 2: DataTablesのAJAXリクエストを再現
+  // Step 2: DataTablesのAJAXリクエストを再現（表示項目設定を含む）
   const dateStr = `${date} - ${date}`;
-  const ajaxParams = new URLSearchParams({
+  const ajaxBody: Record<string, string> = {
     draw: "1",
     start: "0",
     length: "100",
@@ -270,16 +270,38 @@ async function loadReportPage(cookie: string, date: string): Promise<void> {
     searchDate: dateStr,
     effectKey: "1",
     searchPartnerId: getCredentials().partnerId,
-  });
+    "profilecontentmedia::effectKeyPartner": "1",
+    "profilecontentmedia::effectKeyPartnerCategory": "1",
+    "profilecontentmedia::effectKeyPartnerCategory2": "1",
+    "profilecontentmedia::effectKeyClient": "1",
+    "profilecontentmedia::effectKeyContent": "1",
+    "profilecontentmedia::effectKeyGroup": "0",
+    "profilecontentmedia::clickCount": "1",
+    "profilecontentmedia::middleClickCount": "1",
+    "profilecontentmedia::ctr": "1",
+    "profilecontentmedia::cvrCl": "1",
+    "profilecontentmedia::cvrMcl": "1",
+    "profilecontentmedia::actionCount": "1",
+    "profilecontentmedia::amount": "1",
+    "profilecontentmedia::actionReward": "1",
+    "profilecontentmedia::graph": "1",
+  };
 
-  await fetch(`${BASE_URL}/admin/profilecontentmedia/list?${ajaxParams.toString()}`, {
+  const ajaxQueryStr = Object.entries(ajaxBody)
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join("&");
+
+  await fetch(`${BASE_URL}/admin/profilecontentmedia/list`, {
+    method: "POST",
     headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
       Cookie: cookie,
       "User-Agent": UA,
       "X-Requested-With": "XMLHttpRequest",
       Accept: "application/json, text/javascript, */*; q=0.01",
       Referer: `${BASE_URL}/admin/profilecontentmedia/list`,
     },
+    body: ajaxQueryStr,
   });
 }
 

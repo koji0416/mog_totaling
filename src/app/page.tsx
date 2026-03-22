@@ -29,6 +29,7 @@ interface SyncResult {
   projectName?: string;
   cellsWritten?: number;
   error?: string;
+  debug?: string;
 }
 
 function fmtSyncDate(d: Date): string {
@@ -515,7 +516,7 @@ export default function ProjectsPage() {
                               </span>
                             </td>
                             <td className="px-3 py-1.5 text-gray-500">{r.projectName || "-"}</td>
-                            <td className="px-3 py-1.5 text-right text-gray-600">{r.cellsWritten ?? "-"}</td>
+                            <td className="px-3 py-1.5 text-right text-gray-600">{r.cellsWritten ?? "-"}{r.debug && <span className="ml-2 text-[10px] text-gray-400">{r.debug}</span>}</td>
                           </tr>
                         ))}
                     </tbody>
