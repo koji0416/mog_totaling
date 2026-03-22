@@ -5,7 +5,7 @@ import { createServerSupabase } from "@/lib/supabase";
 import {
   createOAuth2Client,
   extractSpreadsheetId,
-  getSheetNames,
+  getSheetList,
   shouldSkipSheet,
   parseSheetName,
   getCodeColumnMap,
@@ -61,7 +61,9 @@ export async function POST(request: NextRequest) {
     }
 
     // シート名一覧取得
-    const sheetNames = await getSheetNames(sheets, spreadsheetId);
+    const sheetList = await getSheetList(sheets, spreadsheetId);
+    const sheetNames = sheetList.map((s) => s.title);
+    const sheetIdMap = new Map(sheetList.map((s) => [s.title, s.sheetId]));
 
     // Supabaseから全プロジェクト取得
     const supabase = createServerSupabase();
@@ -167,6 +169,18 @@ export async function POST(request: NextRequest) {
 
         // セル更新リスト作成
         const updates: CellUpdate[] = [];
+        const sid = sheetIdMap.get(sheetName) || 0;
+
+        // ヘルパー: CellUpdateを作成
+        function addUpdate(col: number, dateRow: number, value: number) {
+          updates.push({
+            range: `'${sheetName}'!${colToLetter(col)}${dateRow}`,
+            value,
+            sheetId: sid,
+            row: dateRow - 1, // 0-based
+            col,              // 0-based
+          });
+        }
 
         // 広告データ（コード×日別）
         for (const row of adRes.data || []) {
@@ -174,21 +188,9 @@ export async function POST(request: NextRequest) {
           const codeCol = codeColMap.get(row.code);
           if (dateRow === undefined || codeCol === undefined) continue;
 
-          // 広告費
-          updates.push({
-            range: `'${sheetName}'!${colToLetter(codeCol + CODE_SECTION_OFFSETS.adSpend)}${dateRow}`,
-            value: Math.round(row.spend),
-          });
-          // imp
-          updates.push({
-            range: `'${sheetName}'!${colToLetter(codeCol + CODE_SECTION_OFFSETS.imp)}${dateRow}`,
-            value: row.impressions,
-          });
-          // クリック
-          updates.push({
-            range: `'${sheetName}'!${colToLetter(codeCol + CODE_SECTION_OFFSETS.clicks)}${dateRow}`,
-            value: row.clicks,
-          });
+          addUpdate(codeCol + CODE_SECTION_OFFSETS.adSpend, dateRow, Math.round(row.spend));
+          addUpdate(codeCol + CODE_SECTION_OFFSETS.imp, dateRow, row.impressions);
+          addUpdate(codeCol + CODE_SECTION_OFFSETS.clicks, dateRow, row.clicks);
         }
 
         // CATSデータ（コード×日別）
@@ -197,16 +199,8 @@ export async function POST(request: NextRequest) {
           const codeCol = codeColMap.get(row.code);
           if (dateRow === undefined || codeCol === undefined) continue;
 
-          // MCV
-          updates.push({
-            range: `'${sheetName}'!${colToLetter(codeCol + CODE_SECTION_OFFSETS.mcv)}${dateRow}`,
-            value: row.mcv,
-          });
-          // CV
-          updates.push({
-            range: `'${sheetName}'!${colToLetter(codeCol + CODE_SECTION_OFFSETS.cv)}${dateRow}`,
-            value: row.cv,
-          });
+          addUpdate(codeCol + CODE_SECTION_OFFSETS.mcv, dateRow, row.mcv);
+          addUpdate(codeCol + CODE_SECTION_OFFSETS.cv, dateRow, row.cv);
         }
 
         // バッチ書き込み

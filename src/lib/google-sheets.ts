@@ -25,16 +25,24 @@ export function extractSpreadsheetId(url: string): string | null {
   return match ? match[1] : null;
 }
 
-// シート名一覧を取得
-export async function getSheetNames(
+// シート名一覧を取得（sheetIdも返す）
+export interface SheetInfo {
+  title: string;
+  sheetId: number;
+}
+
+export async function getSheetList(
   sheets: sheets_v4.Sheets,
   spreadsheetId: string
-): Promise<string[]> {
+): Promise<SheetInfo[]> {
   const res = await sheets.spreadsheets.get({
     spreadsheetId,
-    fields: "sheets.properties.title",
+    fields: "sheets.properties.title,sheets.properties.sheetId",
   });
-  return (res.data.sheets || []).map((s) => s.properties?.title || "");
+  return (res.data.sheets || []).map((s) => ({
+    title: s.properties?.title || "",
+    sheetId: s.properties?.sheetId || 0,
+  }));
 }
 
 // スキップするシート名のパターン
@@ -257,9 +265,12 @@ export function colToLetter(col: number): string {
 export interface CellUpdate {
   range: string; // "'シート名'!AB4"
   value: number;
+  sheetId: number; // 背景色設定用
+  row: number;     // 0-based row index
+  col: number;     // 0-based col index
 }
 
-// バッチで値を書き込み
+// バッチで値を書き込み + 水色の背景色を付ける
 export async function batchUpdateValues(
   sheets: sheets_v4.Sheets,
   spreadsheetId: string,
@@ -267,13 +278,12 @@ export async function batchUpdateValues(
 ): Promise<void> {
   if (updates.length === 0) return;
 
-  // Google Sheets API のバッチ更新（最大で100,000セルまで）
+  // 1. 値の書き込み
   const data = updates.map((u) => ({
     range: u.range,
     values: [[u.value]],
   }));
 
-  // 1000件ずつバッチ送信
   for (let i = 0; i < data.length; i += 1000) {
     const batch = data.slice(i, i + 1000);
     await sheets.spreadsheets.values.batchUpdate({
@@ -282,6 +292,45 @@ export async function batchUpdateValues(
         valueInputOption: "RAW",
         data: batch,
       },
+    });
+  }
+
+  // 2. 背景色を水色に設定
+  const colorRequests = updates.map((u) => ({
+    updateCells: {
+      range: {
+        sheetId: u.sheetId,
+        startRowIndex: u.row,
+        endRowIndex: u.row + 1,
+        startColumnIndex: u.col,
+        endColumnIndex: u.col + 1,
+      },
+      rows: [
+        {
+          values: [
+            {
+              userEnteredFormat: {
+                backgroundColor: {
+                  red: 0.85,
+                  green: 0.93,
+                  blue: 1.0,
+                  alpha: 1.0,
+                },
+              },
+            },
+          ],
+        },
+      ],
+      fields: "userEnteredFormat.backgroundColor",
+    },
+  }));
+
+  // 500件ずつバッチ送信（API制限対策）
+  for (let i = 0; i < colorRequests.length; i += 500) {
+    const batch = colorRequests.slice(i, i + 500);
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests: batch },
     });
   }
 }
